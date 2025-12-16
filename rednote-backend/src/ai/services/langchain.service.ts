@@ -1,0 +1,261 @@
+import { StringOutputParser } from '@langchain/core/output_parsers';
+import { ChatPromptTemplate } from '@langchain/core/prompts';
+import { ChatGoogleGenerativeAI } from '@langchain/google-genai';
+import { ChatOpenAI } from '@langchain/openai';
+import { Injectable, Logger } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
+import { ModelConfig } from '../../common/interfaces/model-config.interface';
+import { Outline } from '../../common/interfaces/outline.interface';
+
+@Injectable()
+export class LangchainService {
+  private readonly logger = new Logger(LangchainService.name);
+
+  constructor(private configService: ConfigService) {}
+
+  private getModel(config: ModelConfig) {
+    const apiKey = config.apiKey || this.getApiKeyForProvider(config.provider);
+    const temperature = config.temperature ?? 0.7;
+    const topP = config.topP ?? 0.95;
+
+    if (config.provider === 'openai' || config.modelName.includes('gpt')) {
+      this.logger.log(`Creating OpenAI model: ${config.modelName}`);
+      return new ChatOpenAI({
+        modelName: config.modelName,
+        apiKey,
+        temperature,
+        topP,
+        configuration: config.baseUrl ? { baseURL: config.baseUrl } : undefined,
+      });
+    } else {
+      this.logger.log(`Creating Google Gemini model: ${config.modelName}`);
+      const googleConfig: ConstructorParameters<
+        typeof ChatGoogleGenerativeAI
+      >[0] = {
+        model: config.modelName,
+        apiKey,
+        temperature,
+        topP,
+      };
+
+      // Add baseUrl support for Google Gemini
+      if (config.baseUrl) {
+        googleConfig.baseUrl = config.baseUrl;
+        this.logger.log(`Using custom baseUrl for Gemini: ${config.baseUrl}`);
+      }
+
+      return new ChatGoogleGenerativeAI(googleConfig);
+    }
+  }
+
+  private getApiKeyForProvider(provider?: string): string {
+    if (provider === 'openai') {
+      return this.configService.get<string>('OPENAI_API_KEY', '');
+    }
+    return this.configService.get<string>('GOOGLE_API_KEY', '');
+  }
+
+  async generateOutlines(
+    topic: string,
+    modelConfig: ModelConfig,
+  ): Promise<Outline[]> {
+    this.logger.log(`Generating outlines for topic: ${topic}`);
+
+    const model = this.getModel(modelConfig);
+
+    const prompt = ChatPromptTemplate.fromMessages([
+      [
+        'system',
+        `你是一个专业的小红书内容创作助手。你需要根据用户提供的主题，生成3个不同风格的创意大纲。
+每个大纲需要包含：
+- title: 吸引人的标题（15-20字）
+- content: 内容要点说明（50-100字）
+- emoji: 一个相关的表情符号
+- tags: 3-5个相关标签
+
+请以 JSON 数组格式返回，格式如下：
+[
+  {{
+    "title": "标题文字",
+    "content": "内容描述",
+    "emoji": "😊",
+    "tags": ["标签1", "标签2", "标签3"]
+  }}
+]
+
+确保返回的是有效的 JSON 格式，不要包含任何额外的文字说明。`,
+      ],
+      ['user', '主题：{topic}'],
+    ]);
+
+    const chain = prompt.pipe(model).pipe(new StringOutputParser());
+
+    const result = await chain.invoke({ topic });
+
+    this.logger.log(`Raw result: ${result}`);
+
+    try {
+      const jsonMatch = result.match(/\[[\s\S]*\]/);
+      const jsonString = jsonMatch ? jsonMatch[0] : result;
+      const outlines = JSON.parse(jsonString) as unknown;
+
+      if (!Array.isArray(outlines)) {
+        throw new Error('Result is not an array');
+      }
+
+      return outlines as Outline[];
+    } catch (error) {
+      const errorMessage =
+        error instanceof Error ? error.message : 'Unknown error';
+      this.logger.error(`Failed to parse outlines: ${errorMessage}`);
+      throw new Error('Failed to generate valid outlines');
+    }
+  }
+
+  async generateOutlinesStream(
+    topic: string,
+    modelConfig: ModelConfig,
+    onChunk: (chunk: string) => void,
+  ): Promise<Outline[]> {
+    this.logger.log(`Generating outlines (streaming) for topic: ${topic}`);
+
+    const model = this.getModel(modelConfig);
+
+    const prompt = ChatPromptTemplate.fromMessages([
+      [
+        'system',
+        `你是一个专业的小红书内容创作助手。你需要根据用户提供的主题，生成3个不同风格的创意大纲。
+每个大纲需要包含：
+- title: 吸引人的标题（15-20字）
+- content: 内容要点说明（50-100字）
+- emoji: 一个相关的表情符号
+- tags: 3-5个相关标签
+
+请以 JSON 数组格式返回，格式如下：
+[
+  {{
+    "title": "标题文字",
+    "content": "内容描述",
+    "emoji": "😊",
+    "tags": ["标签1", "标签2", "标签3"]
+  }}
+]
+
+确保返回的是有效的 JSON 格式，不要包含任何额外的文字说明。`,
+      ],
+      ['user', '主题：{topic}'],
+    ]);
+
+    const chain = prompt.pipe(model).pipe(new StringOutputParser());
+
+    let fullText = '';
+    const stream = await chain.stream({ topic });
+
+    for await (const chunk of stream) {
+      fullText += chunk;
+      onChunk(chunk);
+    }
+
+    this.logger.log(`Full streamed result: ${fullText}`);
+
+    try {
+      const jsonMatch = fullText.match(/\[[\s\S]*\]/);
+      const jsonString = jsonMatch ? jsonMatch[0] : fullText;
+      const outlines = JSON.parse(jsonString) as unknown;
+
+      if (!Array.isArray(outlines)) {
+        throw new Error('Result is not an array');
+      }
+
+      return outlines as Outline[];
+    } catch (error) {
+      const errorMessage =
+        error instanceof Error ? error.message : 'Unknown error';
+      this.logger.error(`Failed to parse streamed outlines: ${errorMessage}`);
+      throw new Error('Failed to generate valid outlines');
+    }
+  }
+
+  async generateCaption(
+    outline: Outline,
+    modelConfig: ModelConfig,
+  ): Promise<string> {
+    this.logger.log(`Generating caption for outline: ${outline.title}`);
+
+    const model = this.getModel(modelConfig);
+
+    const prompt = ChatPromptTemplate.fromMessages([
+      [
+        'system',
+        `你是一个专业的小红书文案创作专家。你需要根据提供的大纲，创作一篇吸引人的小红书文案。
+
+文案要求：
+1. 第一行是醒目的标题，使用emoji增强视觉效果
+2. 内容要有条理，使用emoji分隔要点
+3. 语气亲切自然，像朋友聊天一样
+4. 长度控制在200-300字
+5. 结尾可以适当引导互动（点赞、收藏、关注）
+6. 最后一行添加相关话题标签
+
+直接返回文案内容，不需要任何额外说明。`,
+      ],
+      ['user', `标题：{title}\n内容：{content}\n标签：{tags}`],
+    ]);
+
+    const chain = prompt.pipe(model).pipe(new StringOutputParser());
+
+    const caption = await chain.invoke({
+      title: outline.title,
+      content: outline.content,
+      tags: outline.tags.join(', '),
+    });
+
+    this.logger.log(
+      `Generated caption (preview): ${caption.substring(0, 100)}...`,
+    );
+
+    return caption;
+  }
+
+  async generateImagePrompt(
+    outline: Outline,
+    modelConfig: ModelConfig,
+  ): Promise<string> {
+    this.logger.log(`Generating image prompt for outline: ${outline.title}`);
+
+    const model = this.getModel(modelConfig);
+
+    const prompt = ChatPromptTemplate.fromMessages([
+      [
+        'system',
+        `你是一个专业的小红书图像提示词专家。你需要根据小红书笔记的大纲，生成一个详细的英文图像生成提示词。
+
+提示词要求：
+1. 风格适合小红书内容（时尚、清新、温馨、生活化、网红风格）
+2. 详细描述场景、人物、动作、表情、服饰、配色、光线、构图
+3. 突出小红书的视觉特点：明亮、温暖、有质感、有氛围感
+4. 长度控制在80-150字
+5. 可以包含中文文字元素（如果需要）
+6. 注重细节和情感传达
+
+格式示例：
+"一位年轻女孩坐在咖啡厅靠窗位置，阳光从侧面洒进来，温暖柔和。她穿着米色针织衫，手里拿着拿铁咖啡，脸上带着治愈的微笑。桌上摆放着鲜花和笔记本。整体色调温暖明亮，充满文艺气息和生活感。"
+
+直接返回英文提示词，不需要任何额外说明或引号。`,
+      ],
+      ['user', `标题：{title}\n内容：{content}\n标签：{tags}`],
+    ]);
+
+    const chain = prompt.pipe(model).pipe(new StringOutputParser());
+
+    const imagePrompt = await chain.invoke({
+      title: outline.title,
+      content: outline.content,
+      tags: outline.tags.join('、'),
+    });
+
+    this.logger.log(`Generated image prompt: ${imagePrompt}`);
+
+    return imagePrompt;
+  }
+}

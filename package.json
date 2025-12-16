@@ -1,0 +1,29 @@
+{
+  "name": "rednote-workspace",
+  "version": "1.0.0",
+  "description": "RedNote AI Studio - Full Stack Workspace",
+  "private": true,
+  "scripts": {
+    "dev": "concurrently -n \"backend,frontend\" -c \"bgBlue.bold,bgMagenta.bold\" \"npm run dev:backend\" \"npm run dev:frontend\"",
+    "dev:backend": "cd rednote-backend && npm run start:dev",
+    "dev:frontend": "cd rednote-ai-studio && npm run dev",
+    "install:all": "npm install && cd rednote-backend && npm install && cd ../rednote-ai-studio && npm install",
+    "build:backend": "cd rednote-backend && npm run build",
+    "build:frontend": "cd rednote-ai-studio && npm run build",
+    "build:all": "npm run build:backend && npm run build:frontend",
+    "start:backend": "cd rednote-backend && npm run start:prod",
+    "start:frontend": "cd rednote-ai-studio && npm run preview"
+  },
+  "keywords": [
+    "rednote",
+    "ai",
+    "nestjs",
+    "react",
+    "langchain"
+  ],
+  "author": "",
+  "license": "MIT",
+  "devDependencies": {
+    "concurrently": "^9.1.0"
+  }
+}
