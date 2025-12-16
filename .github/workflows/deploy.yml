@@ -114,17 +114,6 @@ jobs:
           script: |
             set -e
 
-            echo "Preparing target directory..."
-            TARGET_DIR="${{ secrets.TARGET_DIR }}"
-
-            # Check if TARGET_DIR exists and is a file
-            if [ -f "$TARGET_DIR" ]; then
-              echo "Error: $TARGET_DIR is a file, not a directory"
-              exit 1
-            fi
-
-            # Create directory if it doesn't exist
-            mkdir -p "$TARGET_DIR" || true
             cd "$TARGET_DIR"
 
             echo "Creating docker-compose.yml..."
