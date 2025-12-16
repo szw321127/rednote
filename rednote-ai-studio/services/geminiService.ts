@@ -108,9 +108,13 @@ export class ApiService {
       // Assume backend returns the final JSON array in the text stream, or we parse the final accumulated text
       // For robustness, we try to find the JSON array in the text
       try {
-        // Simple extraction logic, backend should ideally return pure JSON or SSE events
-        const jsonMatch = accumulatedText.match(/\[.*\]/s);
-        const jsonString = jsonMatch ? jsonMatch[0] : accumulatedText;
+        // Remove markdown code blocks if present (```json ... ``` or ``` ... ```)
+        let cleanedText = accumulatedText.trim();
+        cleanedText = cleanedText.replace(/^```(?:json)?\s*\n?/i, '').replace(/\n?```\s*$/i, '');
+
+        // Extract JSON array
+        const jsonMatch = cleanedText.match(/\[[\s\S]*\]/);
+        const jsonString = jsonMatch ? jsonMatch[0] : cleanedText;
         const parsed = JSON.parse(jsonString);
         return parsed.map((item: any, index: number) => ({ ...item, id: `outline-${Date.now()}-${index}` }));
       } catch (e) {

@@ -62,11 +62,16 @@ export const DEFAULT_MODELS: ModelConfig[] = [
     name: 'dall-e-3',
     displayName: 'DALL-E 3',
     path: '/v1/images/generations'
+  },
+  {
+    id: 'default-nano',
+    name: 'gemini-3-pro-image-preview',
+    displayName: 'Gemini 3 Pro Image Preview (Nano banana pro)',
   }
 ];
 
 export const DEFAULT_SETTINGS: AppSettings = {
-  backendUrl: '', // Empty means use current domain (nginx reverse proxy)
+  backendUrl: '',
   activeTextModelId: 'default-gemini',
   activeImageModelId: 'default-image',
   models: DEFAULT_MODELS,
