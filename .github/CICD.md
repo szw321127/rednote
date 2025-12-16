@@ -9,14 +9,14 @@
 - **触发条件**:
   - `rednote-backend/` 目录有变化时
   - 可手动触发
-- **镜像名称**: `ghcr.io/你的用户名/self_redink_backend`
+- **镜像名称**: `ghcr.io/你的用户名/rednote_backend`
 
 ### 2. build-frontend.yml
 - **功能**: 构建并推送前端 Docker 镜像
 - **触发条件**:
   - `rednote-ai-studio/` 目录有变化时
   - 可手动触发
-- **镜像名称**: `ghcr.io/你的用户名/self_redink_frontend`
+- **镜像名称**: `ghcr.io/你的用户名/rednote_frontend`
 
 ### 3. deploy.yml
 - **功能**: 构建前后端镜像并部署到服务器
@@ -122,8 +122,8 @@ mkdir -p /home/user/app
 
 构建的镜像会存储在 GitHub Container Registry：
 
-- 后端: `https://github.com/你的用户名/仓库名/pkgs/container/self_redink_backend`
-- 前端: `https://github.com/你的用户名/仓库名/pkgs/container/self_redink_frontend`
+- 后端: `https://github.com/你的用户名/仓库名/pkgs/container/rednote_backend`
+- 前端: `https://github.com/你的用户名/仓库名/pkgs/container/rednote_frontend`
 
 ## 服务器上查看部署状态
 

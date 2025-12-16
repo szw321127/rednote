@@ -54,7 +54,7 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
 
       - name: Backend image digest
-        run: echo ${{ steps.meta.outputs.tags }}
+        run: echo "${{ steps.meta.outputs.tags }}"
 
   # --- 任务2：构建并推送前端 Docker 镜像 ---
   build-and-push-frontend:
@@ -94,7 +94,7 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
 
       - name: Frontend image digest
-        run: echo ${{ steps.meta.outputs.tags }}
+        run: echo "${{ steps.meta.outputs.tags }}"
 
   # --- 任务3：在服务器上部署 ---
   deploy:
