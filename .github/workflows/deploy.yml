@@ -2,19 +2,18 @@
 
 name: Build, Push and Deploy to Server
 
-# 触发条件：当 main 或 master 分支有 push 操作时
+# 触发条件：当 master 分支有 push 操作时
 on:
   push:
     branches:
-      - main
       - master
   workflow_dispatch:  # 允许手动触发
 
 # 设置环境变量
 env:
   REGISTRY: ghcr.io
-  BACKEND_IMAGE_NAME: ${{ github.repository_owner }}/self_redink_backend
-  FRONTEND_IMAGE_NAME: ${{ github.repository_owner }}/self_redink_frontend
+  BACKEND_IMAGE_NAME: ${{ github.repository_owner }}/rednote_backend
+  FRONTEND_IMAGE_NAME: ${{ github.repository_owner }}/rednote_frontend
 
 jobs:
   # --- 任务1：构建并推送后端 Docker 镜像 ---
@@ -127,6 +126,8 @@ jobs:
 
             echo "Creating .env file with configuration..."
             cat > .env << EOF
+            REGISTRY=${{ env.REGISTRY }}
+            IMAGE_OWNER=${{ github.repository_owner }}
             IMAGE_TAG=latest
             GOOGLE_API_KEY=${{ secrets.GOOGLE_API_KEY }}
             OPENAI_API_KEY=${{ secrets.OPENAI_API_KEY }}

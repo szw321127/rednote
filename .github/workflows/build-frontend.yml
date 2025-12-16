@@ -2,11 +2,10 @@
 
 name: Build and Push Frontend Docker Image
 
-# 触发条件：当 main 或 master 分支有 push 操作时
+# 触发条件：当 或 master 分支有 push 操作时
 on:
   push:
     branches:
-      - main
       - master
     paths:
       - 'rednote-ai-studio/**'
@@ -16,7 +15,7 @@ on:
 # 设置环境变量
 env:
   REGISTRY: ghcr.io
-  IMAGE_NAME: ${{ github.repository_owner }}/self_redink_frontend
+  IMAGE_NAME: ${{ github.repository_owner }}/rednote_frontend
 
 jobs:
   build-and-push-frontend:

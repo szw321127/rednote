@@ -7,7 +7,7 @@ services:
     #   context: ./rednote-backend
     #   dockerfile: Dockerfile
     # 或者使用预构建镜像（取消下面一行的注释，并注释掉上面的 build 部分）
-    image: ghcr.io/szw321127/self_redink_backend:${IMAGE_TAG:-latest}
+    image: ${REGISTRY:-ghcr.io}/${IMAGE_OWNER:-szw321127}/rednote_backend:${IMAGE_TAG:-latest}
     container_name: rednote-backend
     restart: unless-stopped
     ports:
@@ -35,7 +35,7 @@ services:
     #   context: ./rednote-ai-studio
     #   dockerfile: Dockerfile
     # 或者使用预构建镜像（取消下面一行的注释，并注释掉上面的 build 部分）
-    image: ghcr.io/szw321127/self_redink_frontend:${IMAGE_TAG:-latest}
+    image: ${REGISTRY:-ghcr.io}/${IMAGE_OWNER:-szw321127}/rednote_frontend:${IMAGE_TAG:-latest}
     container_name: rednote-frontend
     restart: unless-stopped
     ports:
