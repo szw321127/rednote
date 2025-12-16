@@ -13,7 +13,11 @@
       "WebSearch",
       "WebFetch(domain:github.com)",
       "Bash(cat:*)",
-      "Bash(ls:*)"
+      "Bash(ls:*)",
+      "Bash(findstr:*)",
+      "Bash(npm --version:*)",
+      "Bash(node --version)",
+      "Bash(pnpm --version:*)"
     ]
   }
 }
