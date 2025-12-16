@@ -11,7 +11,9 @@
       "Bash(dir:*)",
       "WebFetch(domain:ai.google.dev)",
       "WebSearch",
-      "WebFetch(domain:github.com)"
+      "WebFetch(domain:github.com)",
+      "Bash(cat:*)",
+      "Bash(ls:*)"
     ]
   }
 }

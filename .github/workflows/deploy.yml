@@ -1,0 +1,149 @@
+# .github/workflows/deploy.yml
+
+name: Build, Push and Deploy to Server
+
+# 触发条件：当 main 或 master 分支有 push 操作时
+on:
+  push:
+    branches:
+      - main
+      - master
+  workflow_dispatch:  # 允许手动触发
+
+# 设置环境变量
+env:
+  REGISTRY: ghcr.io
+  BACKEND_IMAGE_NAME: ${{ github.repository_owner }}/self_redink_backend
+  FRONTEND_IMAGE_NAME: ${{ github.repository_owner }}/self_redink_frontend
+
+jobs:
+  # --- 任务1：构建并推送后端 Docker 镜像 ---
+  build-and-push-backend:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Log in to the GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata for Backend Docker
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.BACKEND_IMAGE_NAME }}
+          tags: |
+            type=ref,event=branch
+            type=sha,prefix={{branch}}-
+            type=raw,value=latest,enable={{is_default_branch}}
+
+      - name: Build and push Backend Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./rednote-backend
+          file: ./rednote-backend/Dockerfile
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+
+      - name: Backend image digest
+        run: echo ${{ steps.meta.outputs.tags }}
+
+  # --- 任务2：构建并推送前端 Docker 镜像 ---
+  build-and-push-frontend:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Log in to the GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata for Frontend Docker
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.FRONTEND_IMAGE_NAME }}
+          tags: |
+            type=ref,event=branch
+            type=sha,prefix={{branch}}-
+            type=raw,value=latest,enable={{is_default_branch}}
+
+      - name: Build and push Frontend Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./rednote-ai-studio
+          file: ./rednote-ai-studio/Dockerfile
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+
+      - name: Frontend image digest
+        run: echo ${{ steps.meta.outputs.tags }}
+
+  # --- 任务3：在服务器上部署 ---
+  deploy:
+    needs: [build-and-push-backend, build-and-push-frontend]
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Copy docker-compose.yml and .env.example to server
+        uses: appleboy/scp-action@master
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USER }}
+          key: ${{ secrets.DEPLOY_KEY }}
+          source: "docker-compose.yml,.env.example"
+          target: "${{ secrets.TARGET_DIR }}"
+
+      - name: Deploy to server
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USER }}
+          key: ${{ secrets.DEPLOY_KEY }}
+          script: |
+            set -e
+            cd ${{ secrets.TARGET_DIR }}
+
+            echo "Creating .env file with configuration..."
+            cat > .env << EOF
+            IMAGE_TAG=latest
+            GOOGLE_API_KEY=${{ secrets.GOOGLE_API_KEY }}
+            OPENAI_API_KEY=${{ secrets.OPENAI_API_KEY }}
+            SESSION_SECRET=${{ secrets.SESSION_SECRET }}
+            EOF
+
+            echo "Logging in to GitHub Container Registry..."
+            echo "${{ secrets.GITHUB_TOKEN }}" | docker login ${{ env.REGISTRY }} -u ${{ github.actor }} --password-stdin
+
+            echo "Pulling the latest images..."
+            docker compose pull
+
+            echo "Starting services with docker compose..."
+            docker compose up -d --remove-orphans
+
+            echo "Cleaning up old images..."
+            docker image prune -af
+
+            echo "Deployment successful!"
+            docker compose ps
