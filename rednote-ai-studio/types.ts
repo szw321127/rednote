@@ -66,7 +66,7 @@ export const DEFAULT_MODELS: ModelConfig[] = [
 ];
 
 export const DEFAULT_SETTINGS: AppSettings = {
-  backendUrl: 'http://localhost:3000', // Default local backend
+  backendUrl: '', // Empty means use current domain (nginx reverse proxy)
   activeTextModelId: 'default-gemini',
   activeImageModelId: 'default-image',
   models: DEFAULT_MODELS,

@@ -10,8 +10,9 @@ services:
     image: ${REGISTRY:-ghcr.io}/${IMAGE_OWNER:-szw321127}/rednote_backend:${IMAGE_TAG:-latest}
     container_name: rednote-backend
     restart: unless-stopped
-    ports:
-      - "3000:3000"
+    # Port 3000 is only accessible internally via docker network, not exposed to host
+    expose:
+      - "3000"
     environment:
       - NODE_ENV=production
       - PORT=3000
