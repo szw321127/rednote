@@ -10,6 +10,19 @@ interface GeneratorProps {
   onPostRestored?: () => void; // 恢复后的回调
 }
 
+// 生成 UUID 的兼容函数
+const generateUUID = (): string => {
+  if (typeof crypto !== 'undefined' && crypto.randomUUID) {
+    return crypto.randomUUID();
+  }
+  // Fallback: 生成符合 UUID v4 格式的字符串
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+    const r = Math.random() * 16 | 0;
+    const v = c === 'x' ? r : (r & 0x3 | 0x8);
+    return v.toString(16);
+  });
+};
+
 const Generator: React.FC<GeneratorProps> = ({ settings, initialPost, onPostRestored }) => {
   const [step, setStep] = useState<number>(0); // 0: Input, 1: Outlines, 2: Final
   const [topic, setTopic] = useState('');
@@ -59,7 +72,7 @@ const Generator: React.FC<GeneratorProps> = ({ settings, initialPost, onPostRest
       setOutlines(results);
 
       // 在大纲生成后保存历史记录
-      const historyId = currentHistoryId || crypto.randomUUID();
+      const historyId = currentHistoryId || generateUUID();
       setCurrentHistoryId(historyId);
 
       const historyPost: GeneratedPost = {
@@ -89,7 +102,7 @@ const Generator: React.FC<GeneratorProps> = ({ settings, initialPost, onPostRest
     try {
       const { imageUrl, caption } = await service.generateImageAndCaption(outline);
 
-      const historyId = currentHistoryId || crypto.randomUUID();
+      const historyId = currentHistoryId || generateUUID();
       const newPost: GeneratedPost = {
         id: historyId,
         topic,
