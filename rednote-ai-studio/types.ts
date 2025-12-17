@@ -15,6 +15,14 @@ export interface Outline {
   tags: string[];
 }
 
+export interface CompletedContent {
+  id: string;
+  outline: Outline; // 使用的大纲
+  imageUrl: string; // 图片URL
+  caption: string; // 文案
+  createdAt: number; // 生成时间
+}
+
 export type PostStatus = 'outline' | 'completed';
 
 export interface GeneratedPost {
@@ -22,9 +30,10 @@ export interface GeneratedPost {
   topic: string;
   status: PostStatus; // 'outline' for 大纲阶段, 'completed' for 成品阶段
   outlines: Outline[]; // 所有生成的大纲
-  selectedOutline?: Outline; // 选中的大纲
-  imageUrl?: string; // 图片URL（成品阶段才有）
-  fullCaption?: string; // 文案（成品阶段才有）
+  completedContents?: CompletedContent[]; // 所有生成的成品（新增）
+  selectedOutline?: Outline; // 选中的大纲（保留用于向后兼容）
+  imageUrl?: string; // 图片URL（保留用于向后兼容）
+  fullCaption?: string; // 文案（保留用于向后兼容）
   createdAt: number;
   updatedAt: number;
 }
