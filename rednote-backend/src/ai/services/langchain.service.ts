@@ -6,6 +6,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { ModelConfig } from '../../common/interfaces/model-config.interface';
 import { Outline } from '../../common/interfaces/outline.interface';
+import { parseOutlines } from '../../common/utils/json-parser.util';
 
 @Injectable()
 export class LangchainService {
@@ -58,6 +59,7 @@ export class LangchainService {
   async generateOutlines(
     topic: string,
     modelConfig: ModelConfig,
+    maxRetries: number = 2,
   ): Promise<Outline[]> {
     this.logger.log(`Generating outlines for topic: ${topic}`);
 
@@ -83,33 +85,38 @@ export class LangchainService {
   }}
 ]
 
-确保返回的是有效的 JSON 格式，不要包含任何额外的文字说明。`,
+重要要求：
+- 直接输出 JSON 数组，不要有任何前缀或后缀文字
+- 不要使用 markdown 代码块
+- 不要输出思考过程
+- 第一个字符必须是 [，最后一个字符必须是 ]`,
       ],
       ['user', '主题：{topic}'],
     ]);
 
     const chain = prompt.pipe(model).pipe(new StringOutputParser());
 
-    const result = await chain.invoke({ topic });
+    let lastError: Error | null = null;
 
-    this.logger.log(`Raw result: ${result}`);
+    for (let attempt = 0; attempt <= maxRetries; attempt++) {
+      try {
+        const result = await chain.invoke({ topic });
+        this.logger.log(`Raw result (attempt ${attempt + 1}): ${result}`);
+        return parseOutlines(result);
+      } catch (error) {
+        lastError = error instanceof Error ? error : new Error('Unknown error');
+        this.logger.warn(
+          `Attempt ${attempt + 1} failed: ${lastError.message}`,
+        );
 
-    try {
-      const jsonMatch = result.match(/\[[\s\S]*\]/);
-      const jsonString = jsonMatch ? jsonMatch[0] : result;
-      const outlines = JSON.parse(jsonString) as unknown;
-
-      if (!Array.isArray(outlines)) {
-        throw new Error('Result is not an array');
+        if (attempt < maxRetries) {
+          await new Promise((resolve) => setTimeout(resolve, 1000));
+        }
       }
-
-      return outlines as Outline[];
-    } catch (error) {
-      const errorMessage =
-        error instanceof Error ? error.message : 'Unknown error';
-      this.logger.error(`Failed to parse outlines: ${errorMessage}`);
-      throw new Error('Failed to generate valid outlines');
     }
+
+    this.logger.error(`Failed to parse outlines after ${maxRetries + 1} attempts`);
+    throw new Error('Failed to generate valid outlines');
   }
 
   async generateOutlinesStream(
@@ -141,7 +148,11 @@ export class LangchainService {
   }}
 ]
 
-确保返回的是有效的 JSON 格式，不要包含任何额外的文字说明。`,
+重要要求：
+- 直接输出 JSON 数组，不要有任何前缀或后缀文字
+- 不要使用 markdown 代码块
+- 不要输出思考过程
+- 第一个字符必须是 [，最后一个字符必须是 ]`,
       ],
       ['user', '主题：{topic}'],
     ]);
@@ -159,15 +170,7 @@ export class LangchainService {
     this.logger.log(`Full streamed result: ${fullText}`);
 
     try {
-      const jsonMatch = fullText.match(/\[[\s\S]*\]/);
-      const jsonString = jsonMatch ? jsonMatch[0] : fullText;
-      const outlines = JSON.parse(jsonString) as unknown;
-
-      if (!Array.isArray(outlines)) {
-        throw new Error('Result is not an array');
-      }
-
-      return outlines as Outline[];
+      return parseOutlines(fullText);
     } catch (error) {
       const errorMessage =
         error instanceof Error ? error.message : 'Unknown error';
