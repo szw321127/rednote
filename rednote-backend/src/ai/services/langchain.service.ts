@@ -1,4 +1,7 @@
-import { StringOutputParser } from '@langchain/core/output_parsers';
+import {
+  StringOutputParser,
+  JsonOutputParser,
+} from '@langchain/core/output_parsers';
 import { ChatPromptTemplate } from '@langchain/core/prompts';
 import { ChatGoogleGenerativeAI } from '@langchain/google-genai';
 import { ChatOpenAI } from '@langchain/openai';
@@ -58,58 +61,111 @@ export class LangchainService {
   async generateOutlines(
     topic: string,
     modelConfig: ModelConfig,
+    maxRetries: number = 3,
   ): Promise<Outline[]> {
     this.logger.log(`Generating outlines for topic: ${topic}`);
 
     const model = this.getModel(modelConfig);
 
+    // Use JsonOutputParser for reliable JSON parsing
+    const jsonParser = new JsonOutputParser();
+    const stringParser = new StringOutputParser();
+
     const prompt = ChatPromptTemplate.fromMessages([
       [
         'system',
-        `你是一个专业的小红书内容创作助手。你需要根据用户提供的主题，生成3个不同风格的创意大纲。
-每个大纲需要包含：
-- title: 吸引人的标题（15-20字）
-- content: 内容要点说明（50-100字）
-- emoji: 一个相关的表情符号
-- tags: 3-5个相关标签
+        `你是一个严格遵循指令的AI助手。
 
-请以 JSON 数组格式返回，格式如下：
+任务：根据用户主题生成小红书大纲。
+
+输出格式要求（违反=失败）：
+1. 返回纯JSON数组，不要有任何其他文字
+2. 不要使用markdown代码块
+3. 不要输出思考过程
+4. 不要有任何前缀或后缀文字
+5. 第一个字符必须是 [，最后一个字符必须是 ]
+
+JSON结构：
 [
   {{
-    "title": "标题文字",
-    "content": "内容描述",
-    "emoji": "😊",
+    "title": "标题（15-20字）",
+    "content": "内容要点（50-100字）",
+    "emoji": "表情符号",
     "tags": ["标签1", "标签2", "标签3"]
   }}
 ]
 
-请严格按照以上格式返回，确保是有效的 JSON 格式，不要包含任何额外的文字说明，不要画蛇添足。`,
+示例：
+[
+  {{"title":"周末去哪儿玩","content":"分享北京周边好玩的地方","emoji":"🎡","tags":["周末","北京","旅游"]}}
+]`,
       ],
       ['user', '主题：{topic}'],
     ]);
 
-    const chain = prompt.pipe(model).pipe(new StringOutputParser());
+    // First try with JSON parser
+    let chain: any = prompt.pipe(model).pipe(jsonParser);
 
-    const result = await chain.invoke({ topic });
+    let lastError: Error | null = null;
 
-    this.logger.log(`Raw result: ${result}`);
+    for (let attempt = 0; attempt <= maxRetries; attempt++) {
+      try {
+        let result = await chain.invoke({ topic });
+        this.logger.log(
+          `Parsed result (attempt ${attempt + 1}): ${JSON.stringify(result)}`,
+        );
 
-    try {
-      const jsonMatch = result.match(/\[[\s\S]*\]/);
-      const jsonString = jsonMatch ? jsonMatch[0] : result;
-      const outlines = JSON.parse(jsonString) as unknown;
+        // Handle both direct array and wrapped response
+        let outlines: unknown[];
+        if (Array.isArray(result)) {
+          outlines = result;
+        } else if (
+          result &&
+          typeof result === 'object' &&
+          Array.isArray((result as any).outlines)
+        ) {
+          outlines = (result as any).outlines;
+        } else if (
+          result &&
+          typeof result === 'object' &&
+          Array.isArray((result as any).items)
+        ) {
+          outlines = (result as any).items;
+        } else {
+          throw new Error('Unexpected response format');
+        }
 
-      if (!Array.isArray(outlines)) {
-        throw new Error('Result is not an array');
+        return outlines.map((item: unknown) => {
+          const obj = item as Record<string, unknown>;
+          return {
+            title: String(obj.title || ''),
+            content: String(obj.content || ''),
+            emoji: String(obj.emoji || '📝'),
+            tags: Array.isArray(obj.tags) ? obj.tags.map((t) => String(t)) : [],
+          } as Outline;
+        });
+      } catch (error) {
+        lastError = error instanceof Error ? error : new Error('Unknown error');
+        this.logger.warn(
+          `Attempt ${attempt + 1} failed with JSON parser: ${lastError.message}`,
+        );
+
+        // If JSON parser fails and we haven't tried string parser yet, retry with string parser
+        if (attempt === 0) {
+          this.logger.log('Retrying with string parser...');
+          chain = prompt.pipe(model).pipe(stringParser);
+        }
+
+        if (attempt < maxRetries) {
+          await new Promise((resolve) => setTimeout(resolve, 1500));
+        }
       }
-
-      return outlines as Outline[];
-    } catch (error) {
-      const errorMessage =
-        error instanceof Error ? error.message : 'Unknown error';
-      this.logger.error(`Failed to parse outlines: ${errorMessage}`);
-      throw new Error('Failed to generate valid outlines');
     }
+
+    this.logger.error(
+      `Failed to parse outlines after ${maxRetries + 1} attempts`,
+    );
+    throw new Error('Failed to generate valid outlines');
   }
 
   async generateOutlinesStream(
@@ -124,24 +180,31 @@ export class LangchainService {
     const prompt = ChatPromptTemplate.fromMessages([
       [
         'system',
-        `你是一个专业的小红书内容创作助手。你需要根据用户提供的主题，生成3个不同风格的创意大纲。
-每个大纲需要包含：
-- title: 吸引人的标题（15-20字）
-- content: 内容要点说明（50-100字）
-- emoji: 一个相关的表情符号
-- tags: 3-5个相关标签
+        `你是一个严格遵循指令的AI助手。
 
-请以 JSON 数组格式返回，格式如下：
+任务：根据用户主题生成小红书大纲。
+
+输出格式要求（违反=失败）：
+1. 返回纯JSON数组，不要有任何其他文字
+2. 不要使用markdown代码块
+3. 不要输出思考过程
+4. 不要有任何前缀或后缀文字
+5. 第一个字符必须是 [，最后一个字符必须是 ]
+
+JSON结构：
 [
   {{
-    "title": "标题文字",
-    "content": "内容描述",
-    "emoji": "😊",
+    "title": "标题（15-20字）",
+    "content": "内容要点（50-100字）",
+    "emoji": "表情符号",
     "tags": ["标签1", "标签2", "标签3"]
   }}
 ]
 
-确保返回的是有效的 JSON 格式，不要包含任何额外的文字说明。`,
+示例：
+[
+  {{"title":"周末去哪儿玩","content":"分享北京周边好玩的地方","emoji":"🎡","tags":["周末","北京","旅游"]}}
+]`,
       ],
       ['user', '主题：{topic}'],
     ]);
@@ -159,15 +222,21 @@ export class LangchainService {
     this.logger.log(`Full streamed result: ${fullText}`);
 
     try {
+      // Parse JSON from string result
       const jsonMatch = fullText.match(/\[[\s\S]*\]/);
-      const jsonString = jsonMatch ? jsonMatch[0] : fullText;
-      const outlines = JSON.parse(jsonString) as unknown;
-
-      if (!Array.isArray(outlines)) {
-        throw new Error('Result is not an array');
+      if (!jsonMatch) {
+        throw new Error('No JSON array found in response');
       }
-
-      return outlines as Outline[];
+      const outlines = JSON.parse(jsonMatch[0]) as unknown[];
+      return outlines.map((item: unknown) => {
+        const obj = item as Record<string, unknown>;
+        return {
+          title: String(obj.title || ''),
+          content: String(obj.content || ''),
+          emoji: String(obj.emoji || '📝'),
+          tags: Array.isArray(obj.tags) ? obj.tags.map((t) => String(t)) : [],
+        } as Outline;
+      });
     } catch (error) {
       const errorMessage =
         error instanceof Error ? error.message : 'Unknown error';
