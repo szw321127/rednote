@@ -110,14 +110,21 @@ JSON结构：
 
     for (let attempt = 0; attempt <= maxRetries; attempt++) {
       try {
-        let result = await chain.invoke({ topic });
+        const result = await chain.invoke({ topic });
         this.logger.log(
           `Parsed result (attempt ${attempt + 1}): ${JSON.stringify(result)}`,
         );
 
         // Handle both direct array and wrapped response
         let outlines: unknown[];
-        if (Array.isArray(result)) {
+        if (typeof result === 'string') {
+          // StringOutputParser returned a string — extract JSON array from it
+          const jsonMatch = result.match(/\[[\s\S]*\]/);
+          if (!jsonMatch) {
+            throw new Error('No JSON array found in string response');
+          }
+          outlines = JSON.parse(jsonMatch[0]) as unknown[];
+        } else if (Array.isArray(result)) {
           outlines = result;
         } else if (
           result &&
@@ -147,10 +154,10 @@ JSON结构：
       } catch (error) {
         lastError = error instanceof Error ? error : new Error('Unknown error');
         this.logger.warn(
-          `Attempt ${attempt + 1} failed with JSON parser: ${lastError.message}`,
+          `Attempt ${attempt + 1} failed: ${lastError.message}`,
         );
 
-        // If JSON parser fails and we haven't tried string parser yet, retry with string parser
+        // If JSON parser fails on first attempt, switch to string parser for subsequent retries
         if (attempt === 0) {
           this.logger.log('Retrying with string parser...');
           chain = prompt.pipe(model).pipe(stringParser);
