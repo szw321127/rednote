@@ -56,6 +56,11 @@ export const DEFAULT_MODELS: ModelConfig[] = [
     displayName: 'Gemini 2.5 Flash',
   },
   {
+    id: 'default-gemini-3-flash',
+    name: 'gemini-3-flash-preview',
+    displayName: 'Gemini 3 Flash Preview',
+  },
+  {
     id: 'default-gpt4',
     name: 'gpt-4o',
     displayName: 'GPT-4o (OpenAI)',

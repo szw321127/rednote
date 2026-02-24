@@ -83,12 +83,21 @@ export const getSettings = async (): Promise<AppSettings> => {
         // eslint-disable-next-line @typescript-eslint/no-unused-vars
         const { key, ...data } = request.result;
         
-        // Migration logic: Ensure backendUrl exists
-        const mergedSettings = { ...DEFAULT_SETTINGS, ...data };
+        // Migration logic: Ensure default models exist
+        const userModels = data.models || [];
+        const userModelIds = new Set(userModels.map(m => m.id));
         
-        if (!data.models) {
-             mergedSettings.models = DEFAULT_SETTINGS.models;
-        }
+        // Add missing default models
+        const mergedModels = [
+          ...userModels,
+          ...DEFAULT_SETTINGS.models.filter(m => !userModelIds.has(m.id))
+        ];
+        
+        const mergedSettings = { 
+          ...DEFAULT_SETTINGS, 
+          ...data,
+          models: mergedModels
+        };
         
         resolve(mergedSettings as AppSettings);
       } else {
