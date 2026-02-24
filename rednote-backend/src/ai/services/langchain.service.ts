@@ -47,31 +47,7 @@ export class LangchainService {
         this.logger.log(`Using custom baseUrl for Gemini: ${config.baseUrl}`);
       }
 
-      // Enable JSON mode for Gemini
-      googleConfig.model = config.modelName;
-      googleConfig.apiKey = apiKey;
-      googleConfig.temperature = temperature;
-      googleConfig.topP = topP;
-      googleConfig.maxOutputTokens = 8192;
-
-      const model = new ChatGoogleGenerativeAI(googleConfig);
-
-      // Set JSON mode via model kwargs
-      (model as any).responseSchema = {
-        type: 'array',
-        items: {
-          type: 'object',
-          properties: {
-            title: { type: 'string' },
-            content: { type: 'string' },
-            emoji: { type: 'string' },
-            tags: { type: 'array', items: { type: 'string' } },
-          },
-          required: ['title', 'content', 'emoji', 'tags'],
-        },
-      };
-
-      return model;
+      return new ChatGoogleGenerativeAI(googleConfig);
     }
   }
 
@@ -98,26 +74,31 @@ export class LangchainService {
     const prompt = ChatPromptTemplate.fromMessages([
       [
         'system',
-        `## CRITICAL CONSTRAINTS - 违反=任务失败
-══════════════════════════════════════════════
-- 必须直接返回JSON数组，不要有任何其他文字
-- 禁止使用markdown代码块
-- 禁止输出任何思考过程
-- 禁止有任何前缀或后缀文字
-- 输出必须以 [ 开头，以 ] 结尾
+        `你是一个严格遵循指令的AI助手。
+
+任务：根据用户主题生成小红书大纲。
+
+输出格式要求（违反=失败）：
+1. 返回纯JSON数组，不要有任何其他文字
+2. 不要使用markdown代码块
+3. 不要输出思考过程
+4. 不要有任何前缀或后缀文字
+5. 第一个字符必须是 [，最后一个字符必须是 ]
 
 JSON结构：
 [
-  {
+  {{
     "title": "标题（15-20字）",
     "content": "内容要点（50-100字）",
     "emoji": "表情符号",
     "tags": ["标签1", "标签2", "标签3"]
-  }
+  }}
 ]
 
 示例：
-[{"title":"周末去哪儿玩","content":"分享北京周边好玩的地方","emoji":"🎡","tags":["周末","北京","旅游"]}]`,
+[
+  {{"title":"周末去哪儿玩","content":"分享北京周边好玩的地方","emoji":"🎡","tags":["周末","北京","旅游"]}}
+]`,
       ],
       ['user', '主题：{topic}'],
     ]);
@@ -199,26 +180,31 @@ JSON结构：
     const prompt = ChatPromptTemplate.fromMessages([
       [
         'system',
-        `## CRITICAL CONSTRAINTS - 违反=任务失败
-══════════════════════════════════════════════
-- 必须直接返回JSON数组，不要有任何其他文字
-- 禁止使用markdown代码块
-- 禁止输出任何思考过程
-- 禁止有任何前缀或后缀文字
-- 输出必须以 [ 开头，以 ] 结尾
+        `你是一个严格遵循指令的AI助手。
+
+任务：根据用户主题生成小红书大纲。
+
+输出格式要求（违反=失败）：
+1. 返回纯JSON数组，不要有任何其他文字
+2. 不要使用markdown代码块
+3. 不要输出思考过程
+4. 不要有任何前缀或后缀文字
+5. 第一个字符必须是 [，最后一个字符必须是 ]
 
 JSON结构：
 [
-  {
+  {{
     "title": "标题（15-20字）",
     "content": "内容要点（50-100字）",
     "emoji": "表情符号",
     "tags": ["标签1", "标签2", "标签3"]
-  }
+  }}
 ]
 
 示例：
-[{"title":"周末去哪儿玩","content":"分享北京周边好玩的地方","emoji":"🎡","tags":["周末","北京","旅游"]}]`,
+[
+  {{"title":"周末去哪儿玩","content":"分享北京周边好玩的地方","emoji":"🎡","tags":["周末","北京","旅游"]}}
+]`,
       ],
       ['user', '主题：{topic}'],
     ]);
