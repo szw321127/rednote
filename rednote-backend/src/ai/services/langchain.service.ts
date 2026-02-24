@@ -51,24 +51,24 @@ export class LangchainService {
       googleConfig.temperature = temperature;
       googleConfig.topP = topP;
       googleConfig.maxOutputTokens = 8192;
-      
+
       const model = new ChatGoogleGenerativeAI(googleConfig);
-      
+
       // Set JSON mode via model kwargs
       (model as any).responseSchema = {
-        type: "array",
+        type: 'array',
         items: {
-          type: "object",
+          type: 'object',
           properties: {
-            title: { type: "string" },
-            content: { type: "string" },
-            emoji: { type: "string" },
-            tags: { type: "array", items: { type: "string" } }
+            title: { type: 'string' },
+            content: { type: 'string' },
+            emoji: { type: 'string' },
+            tags: { type: 'array', items: { type: 'string' } },
           },
-          required: ["title", "content", "emoji", "tags"]
-        }
+          required: ['title', 'content', 'emoji', 'tags'],
+        },
       };
-      
+
       return model;
     }
   }
@@ -130,9 +130,7 @@ JSON结构：
         return parseOutlines(result);
       } catch (error) {
         lastError = error instanceof Error ? error : new Error('Unknown error');
-        this.logger.warn(
-          `Attempt ${attempt + 1} failed: ${lastError.message}`,
-        );
+        this.logger.warn(`Attempt ${attempt + 1} failed: ${lastError.message}`);
 
         if (attempt < maxRetries) {
           await new Promise((resolve) => setTimeout(resolve, 1000));
@@ -140,7 +138,9 @@ JSON结构：
       }
     }
 
-    this.logger.error(`Failed to parse outlines after ${maxRetries + 1} attempts`);
+    this.logger.error(
+      `Failed to parse outlines after ${maxRetries + 1} attempts`,
+    );
     throw new Error('Failed to generate valid outlines');
   }
 
