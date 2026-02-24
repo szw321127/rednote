@@ -1,4 +1,4 @@
-import { StringOutputParser } from '@langchain/core/output_parsers';
+import { StringOutputParser, JsonOutputParser } from '@langchain/core/output_parsers';
 import { ChatPromptTemplate } from '@langchain/core/prompts';
 import { ChatGoogleGenerativeAI } from '@langchain/google-genai';
 import { ChatOpenAI } from '@langchain/openai';
@@ -6,7 +6,6 @@ import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { ModelConfig } from '../../common/interfaces/model-config.interface';
 import { Outline } from '../../common/interfaces/outline.interface';
-import { parseOutlines } from '../../common/utils/json-parser.util';
 
 @Injectable()
 export class LangchainService {
@@ -83,11 +82,15 @@ export class LangchainService {
   async generateOutlines(
     topic: string,
     modelConfig: ModelConfig,
-    maxRetries: number = 2,
+    maxRetries: number = 3,
   ): Promise<Outline[]> {
     this.logger.log(`Generating outlines for topic: ${topic}`);
 
     const model = this.getModel(modelConfig);
+
+    // Use JsonOutputParser for reliable JSON parsing
+    const jsonParser = new JsonOutputParser();
+    const stringParser = new StringOutputParser();
 
     const prompt = ChatPromptTemplate.fromMessages([
       [
@@ -96,14 +99,9 @@ export class LangchainService {
 
 任务：根据用户主题生成小红书大纲。
 
-输出格式要求（必须严格遵守）：
-- 返回纯JSON数组，不要有任何其他文字
-- 不要使用markdown代码块
-- 不要输出思考过程
-- 不要有任何前缀或后缀文字
-- 第一个字符必须是 [，最后一个字符必须是 ]
+请直接返回有效的JSON数组，不要有任何其他文字。
 
-JSON结构：
+JSON结构（必须严格遵守）：
 [
   {
     "title": "标题（15-20字）",
@@ -113,29 +111,55 @@ JSON结构：
   }
 ]
 
-示例输出：
-[{"title":"标题","content":"内容","emoji":"😊","tags":["标签"]}]`,
+示例：
+[{"title":"周末去哪儿玩","content":"分享北京周边好玩的地方","emoji":"🎡","tags":["周末","北京","旅游"]}]`,
       ],
       ['user', '主题：{topic}'],
     ]);
 
-    const chain = prompt.pipe(model).pipe(new StringOutputParser());
+    // First try with JSON parser
+    let chain: any = prompt.pipe(model).pipe(jsonParser);
 
     let lastError: Error | null = null;
 
     for (let attempt = 0; attempt <= maxRetries; attempt++) {
       try {
-        const result = await chain.invoke({ topic });
-        this.logger.log(`Raw result (attempt ${attempt + 1}): ${result}`);
-        return parseOutlines(result);
+        let result = await chain.invoke({ topic });
+        this.logger.log(`Parsed result (attempt ${attempt + 1}): ${JSON.stringify(result)}`);
+        
+        // Handle both direct array and wrapped response
+        let outlines: unknown[];
+        if (Array.isArray(result)) {
+          outlines = result;
+        } else if (result && typeof result === 'object' && Array.isArray((result as any).outlines)) {
+          outlines = (result as any).outlines;
+        } else if (result && typeof result === 'object' && Array.isArray((result as any).items)) {
+          outlines = (result as any).items;
+        } else {
+          throw new Error('Unexpected response format');
+        }
+        
+        return outlines.map((item: unknown) => {
+          const obj = item as Record<string, unknown>;
+          return {
+            title: String(obj.title || ''),
+            content: String(obj.content || ''),
+            emoji: String(obj.emoji || '📝'),
+            tags: Array.isArray(obj.tags) ? obj.tags.map(t => String(t)) : [],
+          } as Outline;
+        });
       } catch (error) {
         lastError = error instanceof Error ? error : new Error('Unknown error');
-        this.logger.warn(
-          `Attempt ${attempt + 1} failed: ${lastError.message}`,
-        );
+        this.logger.warn(`Attempt ${attempt + 1} failed with JSON parser: ${lastError.message}`);
+        
+        // If JSON parser fails and we haven't tried string parser yet, retry with string parser
+        if (attempt === 0) {
+          this.logger.log('Retrying with string parser...');
+          chain = prompt.pipe(model).pipe(stringParser);
+        }
 
         if (attempt < maxRetries) {
-          await new Promise((resolve) => setTimeout(resolve, 1000));
+          await new Promise((resolve) => setTimeout(resolve, 1500));
         }
       }
     }
@@ -196,7 +220,21 @@ JSON结构：
     this.logger.log(`Full streamed result: ${fullText}`);
 
     try {
-      return parseOutlines(fullText);
+      // Parse JSON from string result
+      const jsonMatch = fullText.match(/\[[\s\S]*\]/);
+      if (!jsonMatch) {
+        throw new Error('No JSON array found in response');
+      }
+      const outlines = JSON.parse(jsonMatch[0]) as unknown[];
+      return outlines.map((item: unknown) => {
+        const obj = item as Record<string, unknown>;
+        return {
+          title: String(obj.title || ''),
+          content: String(obj.content || ''),
+          emoji: String(obj.emoji || '📝'),
+          tags: Array.isArray(obj.tags) ? obj.tags.map(t => String(t)) : [],
+        } as Outline;
+      });
     } catch (error) {
       const errorMessage =
         error instanceof Error ? error.message : 'Unknown error';
