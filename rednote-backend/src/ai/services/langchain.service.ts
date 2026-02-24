@@ -45,7 +45,31 @@ export class LangchainService {
         this.logger.log(`Using custom baseUrl for Gemini: ${config.baseUrl}`);
       }
 
-      return new ChatGoogleGenerativeAI(googleConfig);
+      // Enable JSON mode for Gemini
+      googleConfig.model = config.modelName;
+      googleConfig.apiKey = apiKey;
+      googleConfig.temperature = temperature;
+      googleConfig.topP = topP;
+      googleConfig.maxOutputTokens = 8192;
+      
+      const model = new ChatGoogleGenerativeAI(googleConfig);
+      
+      // Set JSON mode via model kwargs
+      (model as any).responseSchema = {
+        type: "array",
+        items: {
+          type: "object",
+          properties: {
+            title: { type: "string" },
+            content: { type: "string" },
+            emoji: { type: "string" },
+            tags: { type: "array", items: { type: "string" } }
+          },
+          required: ["title", "content", "emoji", "tags"]
+        }
+      };
+      
+      return model;
     }
   }
 
@@ -68,28 +92,29 @@ export class LangchainService {
     const prompt = ChatPromptTemplate.fromMessages([
       [
         'system',
-        `你是一个专业的小红书内容创作助手。你需要根据用户提供的主题，生成3个不同风格的创意大纲。
-每个大纲需要包含：
-- title: 吸引人的标题（15-20字）
-- content: 内容要点说明（50-100字）
-- emoji: 一个相关的表情符号
-- tags: 3-5个相关标签
+        `你是一个严格遵循指令的AI助手。
 
-请以 JSON 数组格式返回，格式如下：
+任务：根据用户主题生成小红书大纲。
+
+输出格式要求（必须严格遵守）：
+- 返回纯JSON数组，不要有任何其他文字
+- 不要使用markdown代码块
+- 不要输出思考过程
+- 不要有任何前缀或后缀文字
+- 第一个字符必须是 [，最后一个字符必须是 ]
+
+JSON结构：
 [
-  {{
-    "title": "标题文字",
-    "content": "内容描述",
-    "emoji": "😊",
+  {
+    "title": "标题（15-20字）",
+    "content": "内容要点（50-100字）",
+    "emoji": "表情符号",
     "tags": ["标签1", "标签2", "标签3"]
-  }}
+  }
 ]
 
-重要要求：
-- 直接输出 JSON 数组，不要有任何前缀或后缀文字
-- 不要使用 markdown 代码块
-- 不要输出思考过程
-- 第一个字符必须是 [，最后一个字符必须是 ]`,
+示例输出：
+[{"title":"标题","content":"内容","emoji":"😊","tags":["标签"]}]`,
       ],
       ['user', '主题：{topic}'],
     ]);
@@ -131,28 +156,29 @@ export class LangchainService {
     const prompt = ChatPromptTemplate.fromMessages([
       [
         'system',
-        `你是一个专业的小红书内容创作助手。你需要根据用户提供的主题，生成3个不同风格的创意大纲。
-每个大纲需要包含：
-- title: 吸引人的标题（15-20字）
-- content: 内容要点说明（50-100字）
-- emoji: 一个相关的表情符号
-- tags: 3-5个相关标签
+        `你是一个严格遵循指令的AI助手。
 
-请以 JSON 数组格式返回，格式如下：
+任务：根据用户主题生成小红书大纲。
+
+输出格式要求（必须严格遵守）：
+- 返回纯JSON数组，不要有任何其他文字
+- 不要使用markdown代码块
+- 不要输出思考过程
+- 不要有任何前缀或后缀文字
+- 第一个字符必须是 [，最后一个字符必须是 ]
+
+JSON结构：
 [
-  {{
-    "title": "标题文字",
-    "content": "内容描述",
-    "emoji": "😊",
+  {
+    "title": "标题（15-20字）",
+    "content": "内容要点（50-100字）",
+    "emoji": "表情符号",
     "tags": ["标签1", "标签2", "标签3"]
-  }}
+  }
 ]
 
-重要要求：
-- 直接输出 JSON 数组，不要有任何前缀或后缀文字
-- 不要使用 markdown 代码块
-- 不要输出思考过程
-- 第一个字符必须是 [，最后一个字符必须是 ]`,
+示例输出：
+[{"title":"标题","content":"内容","emoji":"😊","tags":["标签"]}]`,
       ],
       ['user', '主题：{topic}'],
     ]);
