@@ -3,28 +3,36 @@ import Sidebar from './components/Sidebar';
 import Generator from './views/Generator';
 import History from './views/History';
 import SettingsView from './views/Settings';
+import AuthView from './views/AuthView';
 import { AppSettings, DEFAULT_SETTINGS, ViewState, GeneratedPost } from './types';
 import { getSettings } from './services/db';
 import { ApiService } from './services/geminiService';
+import {
+  isLoggedIn,
+  getUser,
+  setTokens,
+  setUser,
+  clearAuth,
+  AuthUser,
+} from './services/auth';
 
 const App: React.FC = () => {
   const [currentView, setCurrentView] = useState<ViewState>('generator');
   const [settings, setSettings] = useState<AppSettings>(DEFAULT_SETTINGS);
   const [isHydrated, setIsHydrated] = useState(false);
   const [restoredPost, setRestoredPost] = useState<GeneratedPost | null>(null);
+  const [user, setCurrentUser] = useState<AuthUser | null>(getUser());
+  const [showAuth, setShowAuth] = useState(false);
   const isInitialized = useRef(false);
 
   useEffect(() => {
-    // Prevent double initialization in React StrictMode
     if (isInitialized.current) return;
     isInitialized.current = true;
 
-    // Load settings from IndexedDB on startup
     getSettings().then(async (savedSettings) => {
       setSettings(savedSettings);
       setIsHydrated(true);
 
-      // Initialize model config in backend session
       const apiService = new ApiService(savedSettings);
       const success = await apiService.setModelConfig();
       if (success) {
@@ -35,17 +43,42 @@ const App: React.FC = () => {
     });
   }, []);
 
+  const handleLoginSuccess = (data: {
+    accessToken: string;
+    refreshToken: string;
+    user: AuthUser;
+  }) => {
+    setTokens(data.accessToken, data.refreshToken);
+    setUser(data.user);
+    setCurrentUser(data.user);
+    setShowAuth(false);
+  };
+
+  const handleLogout = () => {
+    clearAuth();
+    setCurrentUser(null);
+  };
+
   const handleRestorePost = (post: GeneratedPost) => {
     setRestoredPost(post);
     setCurrentView('generator');
   };
 
   const handlePostRestored = () => {
-    // 清除 restoredPost，避免重复恢复
     setRestoredPost(null);
   };
 
   if (!isHydrated) return null;
+
+  if (showAuth) {
+    return (
+      <AuthView
+        backendUrl={settings.backendUrl}
+        onLoginSuccess={handleLoginSuccess}
+        onSkip={() => setShowAuth(false)}
+      />
+    );
+  }
 
   const renderView = () => {
     switch (currentView) {
@@ -74,7 +107,13 @@ const App: React.FC = () => {
 
   return (
     <div className="flex min-h-screen bg-gray-50 text-gray-900 font-sans">
-      <Sidebar currentView={currentView} onViewChange={setCurrentView} />
+      <Sidebar
+        currentView={currentView}
+        onViewChange={setCurrentView}
+        user={user}
+        onLoginClick={() => setShowAuth(true)}
+        onLogout={handleLogout}
+      />
       <main className="flex-1 p-6 md:p-10 overflow-y-auto h-screen no-scrollbar">
         {renderView()}
       </main>

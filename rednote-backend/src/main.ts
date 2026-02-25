@@ -3,9 +3,16 @@ import { ValidationPipe, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { AppModule } from './app.module';
 import session from 'express-session';
+import { existsSync, mkdirSync } from 'fs';
 
 async function bootstrap() {
   const logger = new Logger('Bootstrap');
+
+  // Ensure data directory exists for SQLite
+  if (!existsSync('data')) {
+    mkdirSync('data', { recursive: true });
+    logger.log('Created data directory for database');
+  }
 
   const app = await NestFactory.create(AppModule);
 
@@ -56,6 +63,7 @@ async function bootstrap() {
   logger.log(`Application is running on: http://localhost:${port}`);
   logger.log(`Health check: http://localhost:${port}/api/health`);
   logger.log(`CORS enabled for: ${corsOrigins.join(', ')}`);
+  logger.log(`Database: SQLite (data/rednote.db)`);
 }
 
 bootstrap().catch((error) => {
