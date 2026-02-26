@@ -16,10 +16,7 @@ import { User } from '../database/entities/user.entity';
       imports: [ConfigModule],
       inject: [ConfigService],
       useFactory: (configService: ConfigService) => ({
-        secret: configService.get<string>(
-          'JWT_SECRET',
-          'rednote-jwt-secret-change-in-production',
-        ),
+        secret: configService.getOrThrow<string>('JWT_SECRET'),
         signOptions: { expiresIn: '7d' },
       }),
     }),

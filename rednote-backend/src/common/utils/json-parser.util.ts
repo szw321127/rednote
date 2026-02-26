@@ -88,7 +88,9 @@ export function parseOutlines(text: string): Outline[] {
     try {
       return validateOutline(item);
     } catch (error) {
-      throw new Error(`Outline[${index}]: ${error instanceof Error ? error.message : 'Invalid outline'}`);
+      throw new Error(
+        `Outline[${index}]: ${error instanceof Error ? error.message : 'Invalid outline'}`,
+      );
     }
   });
 }

@@ -12,12 +12,14 @@ import { AiModule } from './ai/ai.module';
 import { ConfigStorageModule } from './config-storage/config-storage.module';
 import { SessionModule } from './session/session.module';
 import { StatsModule } from './stats/stats.module';
+import { validateEnv } from './config/env.validation';
 
 @Module({
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
       envFilePath: '.env',
+      validate: validateEnv,
     }),
     // Rate limiting: 60 requests per minute per IP
     ThrottlerModule.forRoot({

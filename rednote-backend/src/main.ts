@@ -21,10 +21,7 @@ async function bootstrap() {
   // Configure session
   app.use(
     session({
-      secret: configService.get<string>(
-        'SESSION_SECRET',
-        'rednote-default-secret-key-change-in-production',
-      ),
+      secret: configService.getOrThrow<string>('SESSION_SECRET'),
       resave: false,
       saveUninitialized: false,
       cookie: {

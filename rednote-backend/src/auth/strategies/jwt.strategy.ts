@@ -9,11 +9,11 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     super({
       jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
       ignoreExpiration: false,
-      secretOrKey: configService.get<string>('JWT_SECRET', 'rednote-jwt-secret-change-in-production'),
+      secretOrKey: configService.getOrThrow<string>('JWT_SECRET'),
     });
   }
 
-  validate(payload: { sub: string; email: string }) {
-    return { sub: payload.sub, email: payload.email };
+  validate(payload: { sub: string; email: string; role?: string }) {
+    return { sub: payload.sub, email: payload.email, role: payload.role };
   }
 }
