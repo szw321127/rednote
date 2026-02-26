@@ -1,61 +1,9 @@
 import { Type } from 'class-transformer';
+import { IsOptional, ValidateNested } from 'class-validator';
 import {
-  IsIn,
-  IsNotEmpty,
-  IsNumber,
-  IsOptional,
-  IsString,
-  Max,
-  Min,
-  ValidateNested,
-} from 'class-validator';
-
-class ModelConfigDto {
-  @IsIn(['google', 'gemini', 'openai'])
-  provider: string;
-
-  @IsString()
-  @IsNotEmpty()
-  modelName: string;
-
-  @IsOptional()
-  @IsString()
-  apiKey?: string;
-
-  @IsOptional()
-  @IsString()
-  baseUrl?: string;
-
-  @IsOptional()
-  @IsString()
-  path?: string;
-
-  @IsOptional()
-  @IsNumber()
-  @Min(0)
-  @Max(2)
-  temperature?: number;
-
-  @IsOptional()
-  @IsNumber()
-  @Min(0)
-  @Max(1)
-  topP?: number;
-}
-
-class GenerateParametersDto {
-  @IsOptional()
-  @IsNumber()
-  @Min(0)
-  @Max(2)
-  temperature?: number;
-
-  @IsOptional()
-  @IsNumber()
-  @Min(0)
-  @Max(1)
-  topP?: number;
-}
+  GenerateParametersDto,
+  ModelConfigDto,
+} from '../../common/dto/model-config.dto';
 
 export class SetModelConfigDto {
   @ValidateNested()

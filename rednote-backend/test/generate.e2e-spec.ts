@@ -213,6 +213,23 @@ describe('Generate Module (e2e)', () => {
         .expect(400);
     });
 
+    it('should reject malformed nested outline payload', async () => {
+      const server = ctx.app.getHttpServer() as App;
+      const cookies = await setupSession(server);
+
+      await request(server)
+        .post('/api/generate/content')
+        .set('Cookie', cookies)
+        .send({
+          outline: {
+            title: 'bad outline',
+            content: 'missing emoji and invalid tags',
+            tags: [],
+          },
+        })
+        .expect(400);
+    });
+
     it('should reject when quota exceeded', async () => {
       const server = ctx.app.getHttpServer() as App;
       const cookies = await setupSession(server);

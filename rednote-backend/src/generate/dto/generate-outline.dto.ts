@@ -1,19 +1,27 @@
-import { IsString, IsNotEmpty, IsObject, IsOptional } from 'class-validator';
-import type { ModelConfig } from '../../common/interfaces/model-config.interface';
+import { Type } from 'class-transformer';
+import {
+  IsNotEmpty,
+  IsOptional,
+  IsString,
+  ValidateNested,
+} from 'class-validator';
+import {
+  GenerateParametersDto,
+  ModelConfigDto,
+} from '../../common/dto/model-config.dto';
 
 export class GenerateOutlineDto {
   @IsString()
   @IsNotEmpty()
   topic: string;
 
-  @IsObject()
+  @ValidateNested()
+  @Type(() => ModelConfigDto)
   @IsOptional()
-  modelConfig?: ModelConfig;
+  modelConfig?: ModelConfigDto;
 
-  @IsObject()
+  @ValidateNested()
+  @Type(() => GenerateParametersDto)
   @IsOptional()
-  parameters?: {
-    temperature?: number;
-    topP?: number;
-  };
+  parameters?: GenerateParametersDto;
 }

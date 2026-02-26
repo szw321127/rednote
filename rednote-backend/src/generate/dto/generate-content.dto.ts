@@ -1,17 +1,47 @@
-import { IsObject, IsNotEmpty, IsOptional } from 'class-validator';
-import type { ModelConfig } from '../../common/interfaces/model-config.interface';
-import type { Outline } from '../../common/interfaces/outline.interface';
+import { Type } from 'class-transformer';
+import {
+  ArrayNotEmpty,
+  IsArray,
+  IsDefined,
+  IsNotEmpty,
+  IsOptional,
+  IsString,
+  ValidateNested,
+} from 'class-validator';
+import { ModelConfigDto } from '../../common/dto/model-config.dto';
+
+class OutlineDto {
+  @IsString()
+  @IsNotEmpty()
+  title: string;
+
+  @IsString()
+  @IsNotEmpty()
+  content: string;
+
+  @IsString()
+  @IsNotEmpty()
+  emoji: string;
+
+  @IsArray()
+  @ArrayNotEmpty()
+  @IsString({ each: true })
+  tags: string[];
+}
 
 export class GenerateContentDto {
-  @IsObject()
-  @IsNotEmpty()
-  outline: Outline;
+  @IsDefined()
+  @ValidateNested()
+  @Type(() => OutlineDto)
+  outline: OutlineDto;
 
-  @IsObject()
+  @ValidateNested()
+  @Type(() => ModelConfigDto)
   @IsOptional()
-  textModelConfig?: ModelConfig;
+  textModelConfig?: ModelConfigDto;
 
-  @IsObject()
+  @ValidateNested()
+  @Type(() => ModelConfigDto)
   @IsOptional()
-  imageModelConfig?: ModelConfig;
+  imageModelConfig?: ModelConfigDto;
 }

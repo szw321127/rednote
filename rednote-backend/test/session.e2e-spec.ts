@@ -97,6 +97,34 @@ describe('Session Module (e2e)', () => {
       expect(res.body.success).toBe(true);
     });
 
+    it('should reject invalid provider enum', async () => {
+      await request(ctx.app.getHttpServer() as App)
+        .post('/api/session/set-model-config')
+        .send({
+          textModelConfig: {
+            provider: 'claude',
+            modelName: 'claude-3-7',
+          },
+        })
+        .expect(400);
+    });
+
+    it('should reject out-of-range generation parameters', async () => {
+      await request(ctx.app.getHttpServer() as App)
+        .post('/api/session/set-model-config')
+        .send({
+          textModelConfig: {
+            provider: 'google',
+            modelName: 'gemini-pro',
+          },
+          parameters: {
+            temperature: 3,
+            topP: 2,
+          },
+        })
+        .expect(400);
+    });
+
     it('should reject unallowlisted baseUrl', async () => {
       await request(ctx.app.getHttpServer() as App)
         .post('/api/session/set-model-config')

@@ -11,6 +11,8 @@ import { ModelConfig } from '../../common/interfaces/model-config.interface';
 import { Outline } from '../../common/interfaces/outline.interface';
 import { redactSecrets, summarizeText } from '../../common/logging/redaction.util';
 import { resolveAndValidateEndpoint } from '../../common/security/ai-endpoint-policy.util';
+import { parseOutlineOutput } from '../schemas/outline-output.schema';
+import { AiOutputValidationException } from '../exceptions/ai-output-validation.exception';
 
 @Injectable()
 export class LangchainService {
@@ -148,25 +150,7 @@ JSON结构：
           throw new Error('Unexpected response format');
         }
 
-        return outlines.map((item: unknown) => {
-          const obj = item as Record<string, unknown>;
-          const title = typeof obj.title === 'string' ? obj.title : '';
-          const content = typeof obj.content === 'string' ? obj.content : '';
-          const emoji = typeof obj.emoji === 'string' ? obj.emoji : '📝';
-          const tags = Array.isArray(obj.tags)
-            ? obj.tags
-                .filter((tag): tag is string => typeof tag === 'string')
-                .map((tag) => tag.trim())
-                .filter(Boolean)
-            : [];
-
-          return {
-            title,
-            content,
-            emoji,
-            tags,
-          } as Outline;
-        });
+        return parseOutlineOutput(outlines);
       } catch (error) {
         lastError = error instanceof Error ? error : new Error('Unknown error');
         const safeError = summarizeText(redactSecrets(lastError.message), 240);
@@ -187,7 +171,7 @@ JSON结构：
     this.logger.error(
       `Failed to parse outlines after ${maxRetries + 1} attempts`,
     );
-    throw new Error('Failed to generate valid outlines');
+    throw new AiOutputValidationException('outlines');
   }
 
   async generateOutlinesStream(
@@ -252,32 +236,14 @@ JSON结构：
         throw new Error('No JSON array found in response');
       }
       const outlines = JSON.parse(jsonMatch[0]) as unknown[];
-      return outlines.map((item: unknown) => {
-        const obj = item as Record<string, unknown>;
-        const title = typeof obj.title === 'string' ? obj.title : '';
-        const content = typeof obj.content === 'string' ? obj.content : '';
-        const emoji = typeof obj.emoji === 'string' ? obj.emoji : '📝';
-        const tags = Array.isArray(obj.tags)
-          ? obj.tags
-              .filter((tag): tag is string => typeof tag === 'string')
-              .map((tag) => tag.trim())
-              .filter(Boolean)
-          : [];
-
-        return {
-          title,
-          content,
-          emoji,
-          tags,
-        } as Outline;
-      });
+      return parseOutlineOutput(outlines);
     } catch (error) {
       const errorMessage =
         error instanceof Error ? error.message : 'Unknown error';
       this.logger.error(
-        `Failed to parse streamed outlines: ${redactSecrets(errorMessage)}`,
+        `Failed to parse streamed outlines: ${summarizeText(redactSecrets(errorMessage), 220)}`,
       );
-      throw new Error('Failed to generate valid outlines');
+      throw new AiOutputValidationException('outlines');
     }
   }
 

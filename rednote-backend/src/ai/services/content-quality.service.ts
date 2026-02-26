@@ -4,6 +4,7 @@ import { ChatPromptTemplate } from '@langchain/core/prompts';
 import { ChatGoogleGenerativeAI } from '@langchain/google-genai';
 import { ConfigService } from '@nestjs/config';
 import { redactSecrets, summarizeText } from '../../common/logging/redaction.util';
+import { parseQualityScore } from '../schemas/quality-score.schema';
 
 export interface QualityScore {
   overall: number; // 0-100
@@ -57,10 +58,12 @@ JSON格式：
 
       const jsonMatch = result.match(/\{[\s\S]*\}/);
       if (jsonMatch) {
-        const parsed = JSON.parse(jsonMatch[0]) as QualityScore;
+        const parsed = parseQualityScore(JSON.parse(jsonMatch[0]));
         this.logger.log(`Quality score: ${parsed.overall}`);
         return parsed;
       }
+
+      throw new Error('No valid quality score JSON object found');
     } catch (error) {
       this.logger.warn(
         `Quality evaluation failed: ${summarizeText(redactSecrets(error), 200)}`,
