@@ -41,3 +41,6 @@ lerna-debug.log*
 
 # Build files
 *.tsbuildinfo
+
+# Local runtime data
+/data
