@@ -11,6 +11,7 @@ import { AuthService } from './auth.service';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
+import { RefreshJwtAuthGuard } from './guards/refresh-jwt-auth.guard';
 
 @Controller('api/auth')
 export class AuthController {
@@ -26,10 +27,14 @@ export class AuthController {
     return this.authService.login(dto);
   }
 
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(RefreshJwtAuthGuard)
   @Post('refresh')
   refresh(@Request() req: any) {
-    return this.authService.refreshToken(req.user.sub);
+    return this.authService.refreshToken(
+      req.user.sub,
+      req.user.tokenVersion,
+      req.user.jti,
+    );
   }
 
   @UseGuards(JwtAuthGuard)

@@ -6,6 +6,7 @@ import {
   cleanDatabase,
   createTestUser,
   getAuthToken,
+  getRefreshToken,
 } from './test-setup';
 
 describe('Auth Module (e2e)', () => {
@@ -136,17 +137,49 @@ describe('Auth Module (e2e)', () => {
   });
 
   describe('POST /api/auth/refresh', () => {
-    it('should refresh token with valid JWT', async () => {
+    it('should refresh token with valid refresh JWT', async () => {
       const user = await createTestUser(ctx);
-      const token = getAuthToken(ctx, user);
+      const refreshToken = getRefreshToken(ctx, user);
 
       const res = await request(ctx.app.getHttpServer() as App)
         .post('/api/auth/refresh')
-        .set('Authorization', `Bearer ${token}`)
+        .set('Authorization', `Bearer ${refreshToken}`)
         .expect(201);
 
       expect(res.body).toHaveProperty('accessToken');
       expect(res.body).toHaveProperty('refreshToken');
+    });
+
+    it('should rotate refresh token and reject old token reuse', async () => {
+      const user = await createTestUser(ctx);
+      const oldRefreshToken = getRefreshToken(ctx, user);
+
+      const firstRefresh = await request(ctx.app.getHttpServer() as App)
+        .post('/api/auth/refresh')
+        .set('Authorization', `Bearer ${oldRefreshToken}`)
+        .expect(201);
+
+      expect(firstRefresh.body).toHaveProperty('refreshToken');
+
+      await request(ctx.app.getHttpServer() as App)
+        .post('/api/auth/refresh')
+        .set('Authorization', `Bearer ${oldRefreshToken}`)
+        .expect(401);
+
+      await request(ctx.app.getHttpServer() as App)
+        .post('/api/auth/refresh')
+        .set('Authorization', `Bearer ${firstRefresh.body.refreshToken}`)
+        .expect(201);
+    });
+
+    it('should reject access token on refresh endpoint', async () => {
+      const user = await createTestUser(ctx);
+      const accessToken = getAuthToken(ctx, user);
+
+      await request(ctx.app.getHttpServer() as App)
+        .post('/api/auth/refresh')
+        .set('Authorization', `Bearer ${accessToken}`)
+        .expect(401);
     });
 
     it('should reject without token', async () => {

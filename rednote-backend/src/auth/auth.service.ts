@@ -6,11 +6,29 @@ import {
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { InjectRepository } from '@nestjs/typeorm';
+import { ConfigService } from '@nestjs/config';
 import { Repository } from 'typeorm';
 import * as bcrypt from 'bcrypt';
+import { randomUUID } from 'node:crypto';
 import { User } from '../database/entities/user.entity';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
+
+interface AccessTokenPayload {
+  sub: string;
+  email: string;
+  role: string;
+  type: 'access';
+}
+
+interface RefreshTokenPayload {
+  sub: string;
+  email: string;
+  role: string;
+  type: 'refresh';
+  tokenVersion: number;
+  jti: string;
+}
 
 @Injectable()
 export class AuthService {
@@ -20,6 +38,7 @@ export class AuthService {
     @InjectRepository(User)
     private readonly userRepo: Repository<User>,
     private readonly jwtService: JwtService,
+    private readonly configService: ConfigService,
   ) {}
 
   async register(dto: RegisterDto) {
@@ -36,12 +55,13 @@ export class AuthService {
       password: hashedPassword,
       nickname: dto.nickname || dto.email.split('@')[0],
       quotaResetAt: this.getNextMonthStart(),
+      tokenVersion: 0,
     });
 
     const saved = await this.userRepo.save(user);
-    this.logger.log(`User registered: ${saved.email}`);
+    this.logger.log(`User registered: userId=${saved.id}`);
 
-    return this.generateTokens(saved);
+    return this.issueTokens(saved, true);
   }
 
   async login(dto: LoginDto) {
@@ -57,16 +77,25 @@ export class AuthService {
       throw new UnauthorizedException('Invalid credentials');
     }
 
-    this.logger.log(`User logged in: ${user.email}`);
-    return this.generateTokens(user);
+    this.logger.log(`User logged in: userId=${user.id}`);
+    return this.issueTokens(user, true);
   }
 
-  async refreshToken(userId: string) {
+  async refreshToken(userId: string, tokenVersion: number, jti: string) {
     const user = await this.userRepo.findOne({ where: { id: userId } });
     if (!user) {
       throw new UnauthorizedException('User not found');
     }
-    return this.generateTokens(user);
+
+    if (
+      user.tokenVersion !== tokenVersion ||
+      !user.refreshTokenJti ||
+      user.refreshTokenJti !== jti
+    ) {
+      throw new UnauthorizedException('Refresh token revoked');
+    }
+
+    return this.issueTokens(user, false);
   }
 
   async getProfile(userId: string) {
@@ -80,24 +109,59 @@ export class AuthService {
 
     const profile: Partial<User> = { ...user };
     delete profile.password;
+    delete profile.refreshTokenJti;
     return profile;
   }
 
-  private generateTokens(user: User) {
-    const payload = { sub: user.id, email: user.email, role: user.role };
+  private async issueTokens(user: User, revokeExistingSessions: boolean) {
+    if (revokeExistingSessions) {
+      user.tokenVersion = (user.tokenVersion ?? 0) + 1;
+    }
+
+    user.refreshTokenJti = randomUUID();
+    const persisted = await this.userRepo.save(user);
+
+    const accessPayload: AccessTokenPayload = {
+      sub: persisted.id,
+      email: persisted.email,
+      role: persisted.role,
+      type: 'access',
+    };
+
+    const refreshPayload: RefreshTokenPayload = {
+      ...accessPayload,
+      type: 'refresh',
+      tokenVersion: persisted.tokenVersion,
+      jti: persisted.refreshTokenJti,
+    };
+
     return {
-      accessToken: this.jwtService.sign(payload, { expiresIn: '7d' }),
-      refreshToken: this.jwtService.sign(payload, { expiresIn: '30d' }),
+      accessToken: this.signAccessToken(accessPayload),
+      refreshToken: this.signRefreshToken(refreshPayload),
       user: {
-        id: user.id,
-        email: user.email,
-        nickname: user.nickname,
-        plan: user.plan,
-        role: user.role,
-        quotaLimit: user.quotaLimit,
-        quotaUsed: user.quotaUsed,
+        id: persisted.id,
+        email: persisted.email,
+        nickname: persisted.nickname,
+        plan: persisted.plan,
+        role: persisted.role,
+        quotaLimit: persisted.quotaLimit,
+        quotaUsed: persisted.quotaUsed,
       },
     };
+  }
+
+  private signAccessToken(payload: AccessTokenPayload): string {
+    return this.jwtService.sign(payload, {
+      secret: this.configService.getOrThrow<string>('JWT_SECRET'),
+      expiresIn: '7d',
+    });
+  }
+
+  private signRefreshToken(payload: RefreshTokenPayload): string {
+    return this.jwtService.sign(payload, {
+      secret: this.configService.getOrThrow<string>('JWT_REFRESH_SECRET'),
+      expiresIn: '30d',
+    });
   }
 
   private async checkAndResetQuota(user: User) {

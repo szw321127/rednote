@@ -45,6 +45,12 @@ export class User {
   @Column({ nullable: true })
   fingerprint: string;
 
+  @Column({ default: 0 })
+  tokenVersion: number;
+
+  @Column({ nullable: true })
+  refreshTokenJti: string;
+
   @CreateDateColumn()
   createdAt: Date;
 

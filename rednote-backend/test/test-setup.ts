@@ -7,14 +7,18 @@ import { Content } from '../src/database/entities/content.entity';
 import { LangchainService } from '../src/ai/services/langchain.service';
 import { ImageService } from '../src/ai/services/image.service';
 import { ContentQualityService } from '../src/ai/services/content-quality.service';
-import { AppModule } from '../src/app.module';
+// AppModule is imported lazily after env is prepared.
 import { DataSource, Repository } from 'typeorm';
 import * as bcrypt from 'bcrypt';
 
 export const JWT_SECRET = 'test-jwt-secret-1234567890-1234567890';
+export const JWT_REFRESH_SECRET =
+  'test-jwt-refresh-secret-1234567890-1234567890';
 export const SESSION_SECRET = 'test-session-secret-1234567890-1234567890';
 
 process.env.JWT_SECRET = process.env.JWT_SECRET || JWT_SECRET;
+process.env.JWT_REFRESH_SECRET =
+  process.env.JWT_REFRESH_SECRET || JWT_REFRESH_SECRET;
 process.env.SESSION_SECRET = process.env.SESSION_SECRET || SESSION_SECRET;
 process.env.NODE_ENV = process.env.NODE_ENV || 'test';
 
@@ -71,6 +75,8 @@ export const mockQualityService = {
 };
 
 export async function createTestApp(): Promise<TestContext> {
+  const { AppModule } = require('../src/app.module');
+
   const moduleFixture: TestingModule = await Test.createTestingModule({
     imports: [AppModule],
   })
@@ -128,6 +134,8 @@ export async function createTestUser(
     plan: 'free',
     quotaLimit: 50,
     quotaUsed: 0,
+    tokenVersion: 1,
+    refreshTokenJti: `jti-${Date.now()}-${Math.random().toString(36).slice(2)}`,
     quotaResetAt: new Date(
       new Date().getFullYear(),
       new Date().getMonth() + 1,
@@ -139,7 +147,27 @@ export async function createTestUser(
 }
 
 export function getAuthToken(ctx: TestContext, user: User): string {
-  return ctx.jwtService.sign({ sub: user.id, email: user.email });
+  return ctx.jwtService.sign({
+    sub: user.id,
+    email: user.email,
+    type: 'access',
+  });
+}
+
+export function getRefreshToken(ctx: TestContext, user: User): string {
+  return ctx.jwtService.sign(
+    {
+      sub: user.id,
+      email: user.email,
+      type: 'refresh',
+      tokenVersion: user.tokenVersion,
+      jti: user.refreshTokenJti,
+    },
+    {
+      secret: process.env.JWT_REFRESH_SECRET,
+      expiresIn: '30d',
+    },
+  );
 }
 
 export function resetMocks(): void {

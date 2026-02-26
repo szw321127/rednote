@@ -33,6 +33,11 @@ export function validateEnv(config: Record<string, unknown>) {
     process.env.JWT_SECRET ?? asString(config.JWT_SECRET),
   );
 
+  const jwtRefreshSecret = assertStrongSecret(
+    'JWT_REFRESH_SECRET',
+    process.env.JWT_REFRESH_SECRET ?? asString(config.JWT_REFRESH_SECRET),
+  );
+
   const sessionSecret = assertStrongSecret(
     'SESSION_SECRET',
     process.env.SESSION_SECRET ?? asString(config.SESSION_SECRET),
@@ -41,6 +46,7 @@ export function validateEnv(config: Record<string, unknown>) {
   return {
     ...config,
     JWT_SECRET: jwtSecret,
+    JWT_REFRESH_SECRET: jwtRefreshSecret,
     SESSION_SECRET: sessionSecret,
   };
 }
