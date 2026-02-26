@@ -18,6 +18,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Content } from '../database/entities/content.entity';
 import { User } from '../database/entities/user.entity';
+import { redactSecrets, summarizeText } from '../common/logging/redaction.util';
 
 interface SessionData {
   textModelConfig?: ModelConfig;
@@ -128,7 +129,9 @@ export class GenerateController {
     } catch (error) {
       const errorMessage =
         error instanceof Error ? error.message : 'Unknown error';
-      this.logger.error(`Failed to generate content: ${errorMessage}`);
+      this.logger.error(
+        `Failed to generate content: ${summarizeText(redactSecrets(errorMessage), 200)}`,
+      );
       throw error;
     }
   }

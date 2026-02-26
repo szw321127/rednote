@@ -2,7 +2,7 @@ import { GoogleGenAI, GoogleGenAIOptions } from '@google/genai';
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { ModelConfig } from '../../common/interfaces/model-config.interface';
-import { redactSecrets } from '../../common/logging/redaction.util';
+import { redactSecrets, summarizeText } from '../../common/logging/redaction.util';
 import { resolveAndValidateEndpoint } from '../../common/security/ai-endpoint-policy.util';
 
 interface DallEResponse {
@@ -78,8 +78,10 @@ export class ImageService {
       });
 
       if (!response.ok) {
-        const error = await response.text();
-        this.logger.error(`DALL-E API error: ${redactSecrets(error)}`);
+        const errorBody = await response.text();
+        this.logger.error(
+          `DALL-E API error status=${response.status}, statusText=${response.statusText}, bodyLength=${errorBody.length}`,
+        );
         throw new Error(`DALL-E API error: ${response.statusText}`);
       }
 
@@ -95,7 +97,7 @@ export class ImageService {
       const errorMessage =
         error instanceof Error ? error.message : 'Unknown error';
       this.logger.error(
-        `Failed to generate image with DALL-E: ${redactSecrets(errorMessage)}`,
+        `Failed to generate image with DALL-E: ${summarizeText(redactSecrets(errorMessage), 220)}`,
       );
       throw error;
     }
@@ -159,8 +161,10 @@ export class ImageService {
       });
 
       if (!response.ok) {
-        const error = await response.text();
-        this.logger.error(`Gemini API error: ${redactSecrets(error)}`);
+        const errorBody = await response.text();
+        this.logger.error(
+          `Gemini API error status=${response.status}, statusText=${response.statusText}, bodyLength=${errorBody.length}`,
+        );
         throw new Error(`Gemini API error: ${response.statusText}`);
       }
 
@@ -195,7 +199,7 @@ export class ImageService {
       const errorMessage =
         error instanceof Error ? error.message : 'Unknown error';
       this.logger.error(
-        `Failed to generate image with Gemini Fetch: ${redactSecrets(errorMessage)}`,
+        `Failed to generate image with Gemini Fetch: ${summarizeText(redactSecrets(errorMessage), 220)}`,
       );
       throw error;
     }
@@ -262,7 +266,7 @@ export class ImageService {
       const errorMessage =
         error instanceof Error ? error.message : 'Unknown error';
       this.logger.error(
-        `Failed to generate image with Gemini SDK: ${redactSecrets(errorMessage)}`,
+        `Failed to generate image with Gemini SDK: ${summarizeText(redactSecrets(errorMessage), 220)}`,
       );
       throw error;
     }

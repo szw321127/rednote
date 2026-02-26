@@ -4,6 +4,7 @@ import { ImageService } from '../ai/services/image.service';
 import { ContentQualityService } from '../ai/services/content-quality.service';
 import { Outline } from '../common/interfaces/outline.interface';
 import { ModelConfig } from '../common/interfaces/model-config.interface';
+import { redactSecrets, summarizeText } from '../common/logging/redaction.util';
 
 @Injectable()
 export class GenerateService {
@@ -19,7 +20,7 @@ export class GenerateService {
     topic: string,
     modelConfig: ModelConfig,
   ): Promise<Outline[]> {
-    this.logger.log(`Generating outlines for topic: ${topic}`);
+    this.logger.log(`Generating outlines, topicLength=${topic.length}`);
     return this.langchainService.generateOutlines(topic, modelConfig);
   }
 
@@ -28,7 +29,7 @@ export class GenerateService {
     modelConfig: ModelConfig,
     onChunk: (chunk: string) => void,
   ): Promise<Outline[]> {
-    this.logger.log(`Generating outlines (streaming) for topic: ${topic}`);
+    this.logger.log(`Generating outlines stream, topicLength=${topic.length}`);
     return this.langchainService.generateOutlinesStream(
       topic,
       modelConfig,
@@ -51,7 +52,9 @@ export class GenerateService {
       suggestions: string[];
     };
   }> {
-    this.logger.log(`Generating content for outline: ${outline.title}`);
+    this.logger.log(
+      `Generating content, titleLength=${outline.title.length}, tagsCount=${outline.tags.length}`,
+    );
 
     // Generate caption and image prompt in parallel
     const [caption, imagePrompt] = await Promise.all([
@@ -70,7 +73,9 @@ export class GenerateService {
     try {
       qualityScore = await this.qualityService.evaluateCaption(caption);
     } catch (error) {
-      this.logger.warn(`Quality evaluation skipped: ${error}`);
+      this.logger.warn(
+        `Quality evaluation skipped: ${summarizeText(redactSecrets(error), 180)}`,
+      );
     }
 
     return {

@@ -9,7 +9,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { ModelConfig } from '../../common/interfaces/model-config.interface';
 import { Outline } from '../../common/interfaces/outline.interface';
-import { redactSecrets } from '../../common/logging/redaction.util';
+import { redactSecrets, summarizeText } from '../../common/logging/redaction.util';
 import { resolveAndValidateEndpoint } from '../../common/security/ai-endpoint-policy.util';
 
 @Injectable()
@@ -66,7 +66,9 @@ export class LangchainService {
     modelConfig: ModelConfig,
     maxRetries: number = 3,
   ): Promise<Outline[]> {
-    this.logger.log(`Generating outlines for topic: ${topic}`);
+    this.logger.log(
+      `Generating outlines request received, topicLength=${topic.length}`,
+    );
 
     const model = this.getModel(modelConfig);
 
@@ -167,9 +169,8 @@ JSON结构：
         });
       } catch (error) {
         lastError = error instanceof Error ? error : new Error('Unknown error');
-        this.logger.warn(
-          `Attempt ${attempt + 1} failed: ${redactSecrets(lastError.message)}`,
-        );
+        const safeError = summarizeText(redactSecrets(lastError.message), 240);
+        this.logger.warn(`Attempt ${attempt + 1} failed: ${safeError}`);
 
         // If JSON parser fails on first attempt, switch to string parser for subsequent retries
         if (attempt === 0) {
@@ -194,7 +195,9 @@ JSON结构：
     modelConfig: ModelConfig,
     onChunk: (chunk: string) => void,
   ): Promise<Outline[]> {
-    this.logger.log(`Generating outlines (streaming) for topic: ${topic}`);
+    this.logger.log(
+      `Generating outlines stream request received, topicLength=${topic.length}`,
+    );
 
     const model = this.getModel(modelConfig);
 
@@ -282,7 +285,9 @@ JSON结构：
     outline: Outline,
     modelConfig: ModelConfig,
   ): Promise<string> {
-    this.logger.log(`Generating caption for outline: ${outline.title}`);
+    this.logger.log(
+      `Generating caption, titleLength=${outline.title.length}, tagsCount=${outline.tags.length}`,
+    );
 
     const model = this.getModel(modelConfig);
 
@@ -321,7 +326,9 @@ JSON结构：
     outline: Outline,
     modelConfig: ModelConfig,
   ): Promise<string> {
-    this.logger.log(`Generating image prompt for outline: ${outline.title}`);
+    this.logger.log(
+      `Generating image prompt, titleLength=${outline.title.length}, contentLength=${outline.content.length}`,
+    );
 
     const model = this.getModel(modelConfig);
 
