@@ -241,7 +241,7 @@ Authorization: Bearer <access_token>
 }
 ```
 
-> 出于安全考虑，接口返回会移除 `models[*].apiKey`。
+> 出于安全考虑，接口会移除 `models[*].apiKey`，并且服务端在保存时也会剥离该字段（API Key 不做云端持久化）。
 
 ### 6. 配置统计（需要登录）
 
