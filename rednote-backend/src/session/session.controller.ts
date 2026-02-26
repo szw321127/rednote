@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Body,
   Controller,
   Logger,
@@ -26,6 +27,7 @@ export class SessionController {
 
     // Process model configs and fill in API keys from env if empty
     if (dto.textModelConfig) {
+      this.rejectCustomEndpointOverride(dto.textModelConfig);
       const normalizedConfig = this.normalizeAndValidateConfig(
         dto.textModelConfig,
       );
@@ -33,6 +35,7 @@ export class SessionController {
     }
 
     if (dto.imageModelConfig) {
+      this.rejectCustomEndpointOverride(dto.imageModelConfig);
       const normalizedConfig = this.normalizeAndValidateConfig(
         dto.imageModelConfig,
       );
@@ -45,6 +48,14 @@ export class SessionController {
       success: true,
       message: 'Model configuration saved to session',
     };
+  }
+
+  private rejectCustomEndpointOverride(config: ModelConfig): void {
+    if (config.baseUrl || config.path) {
+      throw new BadRequestException(
+        'Custom baseUrl/path overrides are no longer allowed for security reasons.',
+      );
+    }
   }
 
   private normalizeAndValidateConfig(config: ModelConfig): ModelConfig {

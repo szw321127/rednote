@@ -109,5 +109,18 @@ describe('Session Module (e2e)', () => {
         })
         .expect(400);
     });
+
+    it('should reject custom path override', async () => {
+      await request(ctx.app.getHttpServer() as App)
+        .post('/api/session/set-model-config')
+        .send({
+          textModelConfig: {
+            provider: 'google',
+            modelName: 'gemini-2.5-flash',
+            path: '/v1beta/models/custom:generateContent',
+          },
+        })
+        .expect(400);
+    });
   });
 });
