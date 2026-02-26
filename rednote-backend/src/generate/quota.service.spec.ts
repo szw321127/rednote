@@ -47,7 +47,11 @@ describe('QuotaService', () => {
       password: 'hashed-password',
       quotaLimit: 3,
       quotaUsed: 0,
-      quotaResetAt: new Date(new Date().getFullYear(), new Date().getMonth() + 1, 1),
+      quotaResetAt: new Date(
+        new Date().getFullYear(),
+        new Date().getMonth() + 1,
+        1,
+      ),
       ...overrides,
     });
 
@@ -74,7 +78,9 @@ describe('QuotaService', () => {
     await quotaService.consumeQuota(user.id);
 
     const error = await quotaService.consumeQuota(user.id).catch((e) => e);
-    expect(error.getResponse()).toMatchObject({ code: QUOTA_EXCEEDED_ERROR_CODE });
+    expect(error.getResponse()).toMatchObject({
+      code: QUOTA_EXCEEDED_ERROR_CODE,
+    });
 
     const updated = await userRepo.findOne({ where: { id: user.id } });
     expect(updated?.quotaUsed).toBe(3);

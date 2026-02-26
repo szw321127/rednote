@@ -2,7 +2,10 @@ import { GoogleGenAI, GoogleGenAIOptions } from '@google/genai';
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { ModelConfig } from '../../common/interfaces/model-config.interface';
-import { redactSecrets, summarizeText } from '../../common/logging/redaction.util';
+import {
+  redactSecrets,
+  summarizeText,
+} from '../../common/logging/redaction.util';
 import { resolveAndValidateEndpoint } from '../../common/security/ai-endpoint-policy.util';
 
 interface DallEResponse {

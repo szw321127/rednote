@@ -7,7 +7,7 @@ import { Content } from '../src/database/entities/content.entity';
 import { LangchainService } from '../src/ai/services/langchain.service';
 import { ImageService } from '../src/ai/services/image.service';
 import { ContentQualityService } from '../src/ai/services/content-quality.service';
-// AppModule is imported lazily after env is prepared.
+import { AppModule } from '../src/app.module';
 import { DataSource, Repository } from 'typeorm';
 import * as bcrypt from 'bcrypt';
 
@@ -75,8 +75,6 @@ export const mockQualityService = {
 };
 
 export async function createTestApp(): Promise<TestContext> {
-  const { AppModule } = require('../src/app.module');
-
   const moduleFixture: TestingModule = await Test.createTestingModule({
     imports: [AppModule],
   })

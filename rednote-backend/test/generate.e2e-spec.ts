@@ -318,7 +318,10 @@ describe('Generate Module (e2e)', () => {
       );
 
       const responses = settled
-        .filter((item): item is PromiseFulfilledResult<any> => item.status === 'fulfilled')
+        .filter(
+          (item): item is PromiseFulfilledResult<any> =>
+            item.status === 'fulfilled',
+        )
         .map((item) => item.value);
 
       expect(responses).toHaveLength(3);

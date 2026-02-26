@@ -9,7 +9,10 @@ import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { ModelConfig } from '../../common/interfaces/model-config.interface';
 import { Outline } from '../../common/interfaces/outline.interface';
-import { redactSecrets, summarizeText } from '../../common/logging/redaction.util';
+import {
+  redactSecrets,
+  summarizeText,
+} from '../../common/logging/redaction.util';
 import { resolveAndValidateEndpoint } from '../../common/security/ai-endpoint-policy.util';
 import { parseOutlineOutput } from '../schemas/outline-output.schema';
 import { AiOutputValidationException } from '../exceptions/ai-output-validation.exception';

@@ -185,9 +185,9 @@ describe('AuthService', () => {
         refreshTokenJti: 'current-jti',
       });
 
-      await expect(service.refreshToken('uuid-1', 3, 'stale-jti')).rejects.toThrow(
-        UnauthorizedException,
-      );
+      await expect(
+        service.refreshToken('uuid-1', 3, 'stale-jti'),
+      ).rejects.toThrow(UnauthorizedException);
     });
   });
 });

@@ -3,7 +3,10 @@ import { StringOutputParser } from '@langchain/core/output_parsers';
 import { ChatPromptTemplate } from '@langchain/core/prompts';
 import { ChatGoogleGenerativeAI } from '@langchain/google-genai';
 import { ConfigService } from '@nestjs/config';
-import { redactSecrets, summarizeText } from '../../common/logging/redaction.util';
+import {
+  redactSecrets,
+  summarizeText,
+} from '../../common/logging/redaction.util';
 import { parseQualityScore } from '../schemas/quality-score.schema';
 
 export interface QualityScore {

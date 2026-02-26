@@ -5,10 +5,7 @@ const outlineSchema = z.object({
   title: z.string().trim().min(1).max(120),
   content: z.string().trim().min(1).max(800),
   emoji: z.string().trim().min(1).max(16).default('📝'),
-  tags: z
-    .array(z.string().trim().min(1).max(30))
-    .max(10)
-    .default([]),
+  tags: z.array(z.string().trim().min(1).max(30)).max(10).default([]),
 });
 
 const outlinesSchema = z.array(outlineSchema).min(1).max(20);
