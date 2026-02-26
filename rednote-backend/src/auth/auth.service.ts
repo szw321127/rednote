@@ -78,12 +78,13 @@ export class AuthService {
     // Reset quota if needed
     await this.checkAndResetQuota(user);
 
-    const { password, ...profile } = user;
+    const profile: Partial<User> = { ...user };
+    delete profile.password;
     return profile;
   }
 
   private generateTokens(user: User) {
-    const payload = { sub: user.id, email: user.email };
+    const payload = { sub: user.id, email: user.email, role: user.role };
     return {
       accessToken: this.jwtService.sign(payload, { expiresIn: '7d' }),
       refreshToken: this.jwtService.sign(payload, { expiresIn: '30d' }),
@@ -92,6 +93,7 @@ export class AuthService {
         email: user.email,
         nickname: user.nickname,
         plan: user.plan,
+        role: user.role,
         quotaLimit: user.quotaLimit,
         quotaUsed: user.quotaUsed,
       },

@@ -6,51 +6,43 @@ export class ConfigStorageService {
   private readonly logger = new Logger(ConfigStorageService.name);
   private readonly configs: Map<string, UserConfig> = new Map();
 
-  saveConfig(fingerprint: string, config: Partial<UserConfig>): UserConfig {
-    this.logger.log(
-      `Saving config for fingerprint: ${fingerprint.substring(0, 10)}...`,
-    );
+  saveConfig(userId: string, config: Partial<UserConfig>): UserConfig {
+    this.logger.log(`Saving config for userId: ${userId}`);
 
-    const existingConfig = this.configs.get(fingerprint);
+    const existingConfig = this.configs.get(userId);
     const updatedConfig: UserConfig = {
       ...existingConfig,
       ...config,
-      fingerprint,
+      userId,
       updatedAt: new Date(),
     };
 
-    this.configs.set(fingerprint, updatedConfig);
+    this.configs.set(userId, updatedConfig);
 
     this.logger.log(
-      `Config saved for fingerprint: ${fingerprint.substring(0, 10)}... (Total configs: ${this.configs.size})`,
+      `Config saved for userId: ${userId} (Total configs: ${this.configs.size})`,
     );
 
     return updatedConfig;
   }
 
-  getConfig(fingerprint: string): UserConfig | null {
-    const config = this.configs.get(fingerprint);
+  getConfig(userId: string): UserConfig | null {
+    const config = this.configs.get(userId);
 
     if (config) {
-      this.logger.log(
-        `Config found for fingerprint: ${fingerprint.substring(0, 10)}...`,
-      );
+      this.logger.log(`Config found for userId: ${userId}`);
     } else {
-      this.logger.log(
-        `No config found for fingerprint: ${fingerprint.substring(0, 10)}...`,
-      );
+      this.logger.log(`No config found for userId: ${userId}`);
     }
 
     return config || null;
   }
 
-  deleteConfig(fingerprint: string): boolean {
-    const deleted = this.configs.delete(fingerprint);
+  deleteConfig(userId: string): boolean {
+    const deleted = this.configs.delete(userId);
 
     if (deleted) {
-      this.logger.log(
-        `Config deleted for fingerprint: ${fingerprint.substring(0, 10)}...`,
-      );
+      this.logger.log(`Config deleted for userId: ${userId}`);
     }
 
     return deleted;

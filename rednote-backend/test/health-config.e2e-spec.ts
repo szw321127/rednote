@@ -4,6 +4,8 @@ import {
   TestContext,
   createTestApp,
   cleanDatabase,
+  createTestUser,
+  getAuthToken,
 } from './test-setup';
 
 describe('Health & Config Storage (e2e)', () => {
@@ -44,111 +46,61 @@ describe('Health & Config Storage (e2e)', () => {
     });
   });
 
-  describe('POST /api/config/save', () => {
-    it('should save config successfully', async () => {
-      const res = await request(ctx.app.getHttpServer() as App)
+  describe('Config endpoints auth & isolation', () => {
+    it('should require authentication for save/get/stats', async () => {
+      const server = ctx.app.getHttpServer() as App;
+
+      await request(server)
         .post('/api/config/save')
+        .send({ config: { activeTextModelId: 'gemini-pro' } })
+        .expect(401);
+
+      await request(server).get('/api/config/get').expect(401);
+
+      await request(server).get('/api/config/stats').expect(401);
+    });
+
+    it('should isolate configs by authenticated userId', async () => {
+      const server = ctx.app.getHttpServer() as App;
+      const userA = await createTestUser(ctx);
+      const userB = await createTestUser(ctx);
+      const tokenA = getAuthToken(ctx, userA);
+      const tokenB = getAuthToken(ctx, userB);
+
+      await request(server)
+        .post('/api/config/save')
+        .set('Authorization', `Bearer ${tokenA}`)
         .send({
-          fingerprint: 'test-fingerprint-12345',
           config: {
-            backendUrl: 'http://localhost:3000',
             activeTextModelId: 'gemini-pro',
-            temperature: 0.7,
+            models: [
+              {
+                id: 'm1',
+                name: 'gemini',
+                displayName: 'Gemini',
+                apiKey: 'secret-key-should-not-be-returned',
+              },
+            ],
           },
         })
         .expect(201);
 
-      expect(res.body).toMatchObject({
-        success: true,
-        message: 'Configuration saved successfully',
-      });
-      expect(res.body.config).toHaveProperty('fingerprint', 'test-fingerprint-12345');
-    });
-
-    it('should reject missing fingerprint', async () => {
-      await request(ctx.app.getHttpServer() as App)
-        .post('/api/config/save')
-        .send({ config: { backendUrl: 'http://localhost:3000' } })
-        .expect(400);
-    });
-
-    it('should reject missing config', async () => {
-      await request(ctx.app.getHttpServer() as App)
-        .post('/api/config/save')
-        .send({ fingerprint: 'test-fp' })
-        .expect(400);
-    });
-
-    it('should update existing config', async () => {
-      const server = ctx.app.getHttpServer() as App;
-
-      await request(server)
-        .post('/api/config/save')
-        .send({
-          fingerprint: 'update-fp-123456789',
-          config: { temperature: 0.5 },
-        })
-        .expect(201);
-
-      const res = await request(server)
-        .post('/api/config/save')
-        .send({
-          fingerprint: 'update-fp-123456789',
-          config: { temperature: 0.9, topP: 0.8 },
-        })
-        .expect(201);
-
-      expect(res.body.config.temperature).toBe(0.9);
-      expect(res.body.config.topP).toBe(0.8);
-    });
-  });
-
-  describe('GET /api/config/get', () => {
-    it('should get saved config', async () => {
-      const server = ctx.app.getHttpServer() as App;
-
-      await request(server)
-        .post('/api/config/save')
-        .send({
-          fingerprint: 'get-test-fp-12345',
-          config: { activeTextModelId: 'gpt-4' },
-        });
-
-      const res = await request(server)
+      const ownConfigRes = await request(server)
         .get('/api/config/get')
-        .query({ fingerprint: 'get-test-fp-12345' })
+        .set('Authorization', `Bearer ${tokenA}`)
         .expect(200);
 
-      expect(res.body.success).toBe(true);
-      expect(res.body.config.activeTextModelId).toBe('gpt-4');
-    });
+      expect(ownConfigRes.body.success).toBe(true);
+      expect(ownConfigRes.body.config.activeTextModelId).toBe('gemini-pro');
+      expect(ownConfigRes.body.config.models[0].apiKey).toBeUndefined();
 
-    it('should return null for unknown fingerprint', async () => {
-      const res = await request(ctx.app.getHttpServer() as App)
+      const otherUserRes = await request(server)
         .get('/api/config/get')
-        .query({ fingerprint: 'unknown-fp-12345' })
+        .set('Authorization', `Bearer ${tokenB}`)
         .expect(200);
 
-      expect(res.body.success).toBe(false);
-      expect(res.body.config).toBeNull();
-    });
-
-    it('should reject missing fingerprint', async () => {
-      await request(ctx.app.getHttpServer() as App)
-        .get('/api/config/get')
-        .expect(400);
-    });
-  });
-
-  describe('GET /api/config/stats', () => {
-    it('should return config stats', async () => {
-      const res = await request(ctx.app.getHttpServer() as App)
-        .get('/api/config/stats')
-        .expect(200);
-
-      expect(res.body).toHaveProperty('totalConfigs');
-      expect(typeof res.body.totalConfigs).toBe('number');
-      expect(res.body).toHaveProperty('message');
+      expect(otherUserRes.body.success).toBe(false);
+      expect(otherUserRes.body.config).toBeNull();
     });
   });
 });

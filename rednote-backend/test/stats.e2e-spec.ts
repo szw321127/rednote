@@ -7,6 +7,7 @@ import {
   createTestUser,
   getAuthToken,
 } from './test-setup';
+import { UserRole } from '../src/database/entities/user.entity';
 
 describe('Stats Module (e2e)', () => {
   let ctx: TestContext;
@@ -84,12 +85,15 @@ describe('Stats Module (e2e)', () => {
   });
 
   describe('GET /api/stats/admin', () => {
-    it('should return admin stats', async () => {
+    it('should return admin stats for admin users', async () => {
       await createTestUser(ctx, { plan: 'free' });
       await createTestUser(ctx, { plan: 'pro' });
 
-      const user = await createTestUser(ctx, { plan: 'enterprise' });
-      const token = getAuthToken(ctx, user);
+      const adminUser = await createTestUser(ctx, {
+        plan: 'enterprise',
+        role: UserRole.ADMIN,
+      });
+      const token = getAuthToken(ctx, adminUser);
 
       const res = await request(ctx.app.getHttpServer() as App)
         .get('/api/stats/admin')
@@ -100,6 +104,16 @@ describe('Stats Module (e2e)', () => {
       expect(res.body.totalContents).toBe(0);
       expect(res.body.planDistribution).toBeInstanceOf(Array);
       expect(res.body.planDistribution.length).toBeGreaterThanOrEqual(1);
+    });
+
+    it('should return 403 for non-admin users', async () => {
+      const user = await createTestUser(ctx, { role: UserRole.USER });
+      const token = getAuthToken(ctx, user);
+
+      await request(ctx.app.getHttpServer() as App)
+        .get('/api/stats/admin')
+        .set('Authorization', `Bearer ${token}`)
+        .expect(403);
     });
 
     it('should reject without auth', async () => {

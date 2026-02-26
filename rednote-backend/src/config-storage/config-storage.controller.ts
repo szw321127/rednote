@@ -3,14 +3,22 @@ import {
   Post,
   Get,
   Body,
-  Query,
   HttpStatus,
   HttpException,
   Logger,
   ValidationPipe,
+  UseGuards,
+  Request,
 } from '@nestjs/common';
 import { ConfigStorageService } from './services/config-storage.service';
 import { SaveConfigDto } from './dto/save-config.dto';
+import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+
+interface AuthenticatedRequest {
+  user: {
+    sub: string;
+  };
+}
 
 @Controller('api/config')
 export class ConfigStorageController {
@@ -18,22 +26,25 @@ export class ConfigStorageController {
 
   constructor(private readonly configStorageService: ConfigStorageService) {}
 
+  @UseGuards(JwtAuthGuard)
   @Post('save')
-  saveConfig(@Body(ValidationPipe) dto: SaveConfigDto) {
-    this.logger.log(
-      `Received config save request for fingerprint: ${dto.fingerprint.substring(0, 10)}...`,
-    );
+  saveConfig(
+    @Body(ValidationPipe) dto: SaveConfigDto,
+    @Request() req: AuthenticatedRequest,
+  ) {
+    const userId = req.user.sub;
+    this.logger.log(`Received config save request for userId: ${userId}`);
 
     try {
-      const savedConfig = this.configStorageService.saveConfig(
-        dto.fingerprint,
-        dto.config,
-      );
+      const savedConfig = this.configStorageService.saveConfig(userId, {
+        ...dto.config,
+        fingerprint: dto.fingerprint,
+      });
 
       return {
         success: true,
         message: 'Configuration saved successfully',
-        config: savedConfig,
+        config: this.sanitizeConfig(savedConfig),
       };
     } catch (error) {
       const errorMessage =
@@ -46,25 +57,18 @@ export class ConfigStorageController {
     }
   }
 
+  @UseGuards(JwtAuthGuard)
   @Get('get')
-  getConfig(@Query('fingerprint') fingerprint: string) {
-    if (!fingerprint) {
-      throw new HttpException(
-        'Fingerprint is required',
-        HttpStatus.BAD_REQUEST,
-      );
-    }
+  getConfig(@Request() req: AuthenticatedRequest) {
+    const userId = req.user.sub;
+    this.logger.log(`Received config get request for userId: ${userId}`);
 
-    this.logger.log(
-      `Received config get request for fingerprint: ${fingerprint.substring(0, 10)}...`,
-    );
-
-    const config = this.configStorageService.getConfig(fingerprint);
+    const config = this.configStorageService.getConfig(userId);
 
     if (!config) {
       return {
         success: false,
-        message: 'No configuration found for this fingerprint',
+        message: 'No configuration found for this user',
         config: null,
       };
     }
@@ -72,10 +76,11 @@ export class ConfigStorageController {
     return {
       success: true,
       message: 'Configuration retrieved successfully',
-      config,
+      config: this.sanitizeConfig(config),
     };
   }
 
+  @UseGuards(JwtAuthGuard)
   @Get('stats')
   getStats() {
     const count = this.configStorageService.getConfigCount();
@@ -84,5 +89,25 @@ export class ConfigStorageController {
       totalConfigs: count,
       message: `Currently storing ${count} user configuration(s)`,
     };
+  }
+
+  private sanitizeConfig(config: unknown) {
+    const cloned = JSON.parse(JSON.stringify(config)) as {
+      models?: Array<Record<string, unknown>>;
+    };
+
+    if (Array.isArray(cloned.models)) {
+      cloned.models = cloned.models.map((model) => {
+        if ('apiKey' in model) {
+          return {
+            ...model,
+            apiKey: undefined,
+          };
+        }
+        return model;
+      });
+    }
+
+    return cloned;
   }
 }
