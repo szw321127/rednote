@@ -19,7 +19,9 @@ services:
       - TZ=Asia/Shanghai
       - GOOGLE_API_KEY=${GOOGLE_API_KEY}
       - OPENAI_API_KEY=${OPENAI_API_KEY}
-      - SESSION_SECRET=${SESSION_SECRET:-rednote-default-secret-key-change-in-production}
+      - JWT_SECRET=${JWT_SECRET:?JWT_SECRET is required and must be strong}
+      - SESSION_SECRET=${SESSION_SECRET:?SESSION_SECRET is required and must be strong}
+      - AI_BASE_URL_ALLOWLIST=${AI_BASE_URL_ALLOWLIST:-}
       - CORS_ORIGINS=http://localhost,http://localhost:80,http://frontend
     networks:
       - rednote-network

@@ -2,6 +2,8 @@ import { GoogleGenAI, GoogleGenAIOptions } from '@google/genai';
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { ModelConfig } from '../../common/interfaces/model-config.interface';
+import { redactSecrets } from '../../common/logging/redaction.util';
+import { resolveAndValidateEndpoint } from '../../common/security/ai-endpoint-policy.util';
 
 interface DallEResponse {
   data?: Array<{
@@ -21,18 +23,23 @@ export class ImageService {
   ): Promise<string> {
     this.logger.log(`Generating image with model: ${modelConfig.modelName}`);
 
-    const apiKey =
-      modelConfig.apiKey || this.getApiKeyForProvider(modelConfig.provider);
+    const normalizedProvider = (modelConfig.provider || '').toLowerCase();
+    const provider =
+      normalizedProvider === 'gemini' ? 'google' : normalizedProvider;
+    const apiKey = modelConfig.apiKey || this.getApiKeyForProvider(provider);
 
-    if (
-      modelConfig.provider === 'openai' ||
-      modelConfig.modelName.includes('dall-e')
-    ) {
-      return this.generateWithDallE(prompt, apiKey, modelConfig);
-    } else {
-      // Use fetch method by default (more reliable and flexible)
-      return this.generateWithGemini(prompt, apiKey, modelConfig);
+    if (provider === 'openai' || modelConfig.modelName.includes('dall-e')) {
+      return this.generateWithDallE(prompt, apiKey, {
+        ...modelConfig,
+        provider: 'openai',
+      });
     }
+
+    // Use SDK method by default
+    return this.generateWithGemini(prompt, apiKey, {
+      ...modelConfig,
+      provider: 'google',
+    });
   }
 
   private async generateWithDallE(
@@ -42,9 +49,18 @@ export class ImageService {
   ): Promise<string> {
     this.logger.log('Generating image with DALL-E');
 
-    const baseUrl = modelConfig.baseUrl || 'https://api.openai.com';
-    const path = modelConfig.path || '/v1/images/generations';
-    const url = `${baseUrl}${path}`;
+    const defaultPath = '/v1/images/generations';
+    const endpoint = resolveAndValidateEndpoint(
+      {
+        ...modelConfig,
+        provider: 'openai',
+        path: modelConfig.path || defaultPath,
+      },
+      this.configService.get<string>('AI_BASE_URL_ALLOWLIST'),
+    );
+
+    const requestPath = endpoint.path || defaultPath;
+    const url = `${endpoint.baseUrl}${requestPath}`;
 
     try {
       const response = await fetch(url, {
@@ -55,7 +71,7 @@ export class ImageService {
         },
         body: JSON.stringify({
           model: modelConfig.modelName || 'dall-e-3',
-          prompt: prompt,
+          prompt,
           n: 1,
           size: '1024x1024',
         }),
@@ -63,7 +79,7 @@ export class ImageService {
 
       if (!response.ok) {
         const error = await response.text();
-        this.logger.error(`DALL-E API error: ${error}`);
+        this.logger.error(`DALL-E API error: ${redactSecrets(error)}`);
         throw new Error(`DALL-E API error: ${response.statusText}`);
       }
 
@@ -74,13 +90,12 @@ export class ImageService {
         throw new Error('No image URL in DALL-E response');
       }
 
-      this.logger.log(`Generated image URL: ${imageUrl}`);
       return imageUrl;
     } catch (error) {
       const errorMessage =
         error instanceof Error ? error.message : 'Unknown error';
       this.logger.error(
-        `Failed to generate image with DALL-E: ${errorMessage}`,
+        `Failed to generate image with DALL-E: ${redactSecrets(errorMessage)}`,
       );
       throw error;
     }
@@ -98,25 +113,23 @@ export class ImageService {
     }
 
     try {
-      const baseUrl =
-        modelConfig.baseUrl || 'https://generativelanguage.googleapis.com';
       const modelName =
         modelConfig.modelName || 'gemini-2.5-flash-image-preview';
+      const defaultPath = `/v1beta/models/${modelName}:generateContent`;
+      const endpoint = resolveAndValidateEndpoint(
+        {
+          ...modelConfig,
+          provider: 'google',
+          path: modelConfig.path || defaultPath,
+        },
+        this.configService.get<string>('AI_BASE_URL_ALLOWLIST'),
+      );
 
-      // Use generateContent endpoint
-      const path =
-        modelConfig.path || `/v1beta/models/${modelName}:generateContent`;
-      const url = `${baseUrl}${path}?key=${apiKey}`;
-
-      this.logger.log(`Request URL: ${url}`);
-      this.logger.log(`Prompt: ${prompt}`);
+      const requestPath = endpoint.path || defaultPath;
+      const url = `${endpoint.baseUrl}${requestPath}`;
 
       const temperature = modelConfig.temperature ?? 0.7;
       const topP = modelConfig.topP ?? 0.95;
-
-      this.logger.log(
-        `Generation config - temperature: ${temperature}, topP: ${topP}`,
-      );
 
       const requestBody = {
         contents: [
@@ -135,24 +148,21 @@ export class ImageService {
         },
       };
 
-      this.logger.log('Sending request to Gemini API via Fetch...');
-
       const response = await fetch(url, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'x-goog-api-key': apiKey,
         },
         body: JSON.stringify(requestBody),
-        signal: AbortSignal.timeout(120000), // 2 minutes timeout
+        signal: AbortSignal.timeout(120000),
       });
 
       if (!response.ok) {
         const error = await response.text();
-        this.logger.error(`Gemini API error: ${error}`);
-        throw new Error(`Gemini API error: ${response.statusText} - ${error}`);
+        this.logger.error(`Gemini API error: ${redactSecrets(error)}`);
+        throw new Error(`Gemini API error: ${response.statusText}`);
       }
-
-      this.logger.log('Received response from Gemini API');
 
       const data = (await response.json()) as {
         candidates?: Array<{
@@ -162,71 +172,31 @@ export class ImageService {
                 data: string;
                 mimeType: string;
               };
-              text?: string;
             }>;
           };
         }>;
       };
 
-      this.logger.log(`Response data: ${JSON.stringify(data, null, 2)}`);
-
-      // Extract image data from response
-      const candidates = data.candidates;
-
-      if (!candidates || candidates.length === 0) {
-        this.logger.error('No candidates in Gemini response');
-        this.logger.error(`Full response: ${JSON.stringify(data)}`);
+      const parts = data.candidates?.[0]?.content?.parts;
+      if (!parts || parts.length === 0) {
         throw new Error('No image data in Gemini response');
       }
 
-      const parts = candidates[0]?.content?.parts;
-      if (!parts || parts.length === 0) {
-        this.logger.error('No parts in candidate');
-        throw new Error('No content parts in response');
-      }
-
-      // Find the image part
       for (const part of parts) {
         if (part.inlineData) {
           const imageData = part.inlineData.data;
           const mimeType = part.inlineData.mimeType || 'image/png';
-
-          this.logger.log(
-            `Successfully generated image with mime type: ${mimeType}`,
-          );
-
-          // Return as base64 data URL
           return `data:${mimeType};base64,${imageData}`;
         }
       }
 
-      this.logger.error('No inline image data found in response');
-      this.logger.error(`Parts: ${JSON.stringify(parts)}`);
       throw new Error('No image data found in Gemini response');
     } catch (error) {
       const errorMessage =
         error instanceof Error ? error.message : 'Unknown error';
       this.logger.error(
-        `Failed to generate image with Gemini Fetch: ${errorMessage}`,
+        `Failed to generate image with Gemini Fetch: ${redactSecrets(errorMessage)}`,
       );
-
-      // Log more details for network errors
-      if (
-        errorMessage.includes('fetch failed') ||
-        errorMessage.includes('aborted')
-      ) {
-        this.logger.error('Network/timeout error detected. Please check:');
-        this.logger.error(
-          '1. Network connection to generativelanguage.googleapis.com',
-        );
-        this.logger.error(
-          '2. Google API key is valid and has Gemini API access',
-        );
-        this.logger.error(
-          '3. Model name is correct and supports image generation',
-        );
-      }
-
       throw error;
     }
   }
@@ -243,95 +213,57 @@ export class ImageService {
     }
 
     try {
-      // Initialize Google Gen AI SDK with optional baseUrl
+      const endpoint = resolveAndValidateEndpoint(
+        { ...modelConfig, provider: 'google' },
+        this.configService.get<string>('AI_BASE_URL_ALLOWLIST'),
+      );
+
       const sdkConfig: GoogleGenAIOptions = {
         apiKey,
+        httpOptions: {
+          baseUrl: endpoint.baseUrl,
+        },
       };
 
-      if (modelConfig.baseUrl) {
-        sdkConfig.httpOptions = {
-          baseUrl: modelConfig.baseUrl,
-        };
-        this.logger.log(`Using custom baseUrl: ${modelConfig.baseUrl}`);
-      }
-
       const ai = new GoogleGenAI(sdkConfig);
-
-      // Use Gemini 2.5 Flash Image or Gemini 3 Pro Image for image generation
-      // These models can generate realistic images with people, environments, animals
       const modelName =
         modelConfig.modelName || 'gemini-2.5-flash-image-preview';
-
-      this.logger.log(`Using Gemini model: ${modelName}`);
-      this.logger.log(`Prompt: ${prompt}`);
-
-      // Prepare generation config with temperature and topP
       const temperature = modelConfig.temperature ?? 0.7;
       const topP = modelConfig.topP ?? 0.95;
 
-      this.logger.log(
-        `Generation config - temperature: ${temperature}, topP: ${topP}`,
+      this.logger.debug(
+        `Gemini generation config model=${modelName}, promptLength=${prompt.length}, temperature=${temperature}, topP=${topP}`,
       );
 
-      // Generate image using the SDK with generation configuration
-      this.logger.log('Sending request to Gemini API...');
       const response = await ai.models.generateContent({
         model: modelName,
         contents: prompt,
         config: {
-          temperature: temperature,
-          topP: topP,
+          temperature,
+          topP,
         },
       });
 
-      this.logger.log('Received response from Gemini');
-
-      // Extract image data from response
       const parts = response.candidates?.[0]?.content?.parts;
-
       if (!parts || parts.length === 0) {
-        this.logger.error('No parts in Gemini response');
-        this.logger.error(`Full response: ${JSON.stringify(response)}`);
         throw new Error('No image data in Gemini response');
       }
 
-      // Find the image part
       for (const part of parts) {
         if (part.inlineData) {
           const imageData = part.inlineData.data;
           const mimeType = part.inlineData.mimeType || 'image/png';
-
-          this.logger.log(
-            `Successfully generated image with mime type: ${mimeType}`,
-          );
-
-          // Return as base64 data URL
           return `data:${mimeType};base64,${imageData}`;
         }
       }
 
-      this.logger.error('No inline image data found in response');
-      this.logger.error(`Response parts: ${JSON.stringify(parts)}`);
       throw new Error('No image data found in Gemini response');
     } catch (error) {
       const errorMessage =
         error instanceof Error ? error.message : 'Unknown error';
       this.logger.error(
-        `Failed to generate image with Gemini SDK: ${errorMessage}`,
+        `Failed to generate image with Gemini SDK: ${redactSecrets(errorMessage)}`,
       );
-
-      // Log more details for network errors
-      if (errorMessage.includes('fetch failed')) {
-        this.logger.error('Network error detected. Please check:');
-        this.logger.error('1. Docker container can access external network');
-        this.logger.error(
-          '2. Google API key is valid and has image generation permissions',
-        );
-        this.logger.error(
-          '3. No firewall blocking requests to generativelanguage.googleapis.com',
-        );
-      }
-
       throw error;
     }
   }

@@ -1,10 +1,6 @@
 import request from 'supertest';
 import { App } from 'supertest/types';
-import {
-  TestContext,
-  createTestApp,
-  cleanDatabase,
-} from './test-setup';
+import { TestContext, createTestApp, cleanDatabase } from './test-setup';
 
 describe('Session Module (e2e)', () => {
   let ctx: TestContext;
@@ -99,6 +95,32 @@ describe('Session Module (e2e)', () => {
         .expect(201);
 
       expect(res.body.success).toBe(true);
+    });
+
+    it('should reject unallowlisted baseUrl', async () => {
+      await request(ctx.app.getHttpServer() as App)
+        .post('/api/session/set-model-config')
+        .send({
+          textModelConfig: {
+            provider: 'openai',
+            modelName: 'gpt-4o-mini',
+            baseUrl: 'https://evil.example.com',
+          },
+        })
+        .expect(400);
+    });
+
+    it('should reject custom path override', async () => {
+      await request(ctx.app.getHttpServer() as App)
+        .post('/api/session/set-model-config')
+        .send({
+          textModelConfig: {
+            provider: 'google',
+            modelName: 'gemini-2.5-flash',
+            path: '/v1beta/models/custom:generateContent',
+          },
+        })
+        .expect(400);
     });
   });
 });

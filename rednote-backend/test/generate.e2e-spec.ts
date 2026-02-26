@@ -78,7 +78,9 @@ describe('Generate Module (e2e)', () => {
         .expect(201);
 
       // Verify quota was deducted
-      const updatedUser = await ctx.userRepo.findOne({ where: { id: user.id } });
+      const updatedUser = await ctx.userRepo.findOne({
+        where: { id: user.id },
+      });
       expect(updatedUser!.quotaUsed).toBe(1);
     });
 
@@ -95,7 +97,9 @@ describe('Generate Module (e2e)', () => {
         .send({ topic: 'Persist Topic' })
         .expect(201);
 
-      const contents = await ctx.contentRepo.find({ where: { userId: user.id } });
+      const contents = await ctx.contentRepo.find({
+        where: { userId: user.id },
+      });
       expect(contents.length).toBe(1);
       expect(contents[0].topic).toBe('Persist Topic');
       expect(contents[0].status).toBe('outline');
@@ -183,7 +187,9 @@ describe('Generate Module (e2e)', () => {
         .send({ outline: testOutline })
         .expect(201);
 
-      const updatedUser = await ctx.userRepo.findOne({ where: { id: user.id } });
+      const updatedUser = await ctx.userRepo.findOne({
+        where: { id: user.id },
+      });
       expect(updatedUser!.quotaUsed).toBe(11);
     });
 
@@ -245,7 +251,9 @@ describe('Generate Module (e2e)', () => {
         .send({ topic: 'Over limit' })
         .expect(400);
 
-      const updatedUser = await ctx.userRepo.findOne({ where: { id: user.id } });
+      const updatedUser = await ctx.userRepo.findOne({
+        where: { id: user.id },
+      });
       expect(updatedUser!.quotaUsed).toBe(3);
     });
 

@@ -11,10 +11,7 @@ import { Content } from './entities/content.entity';
       inject: [ConfigService],
       useFactory: (configService: ConfigService) => ({
         type: 'better-sqlite3' as const,
-        database: configService.get<string>(
-          'DATABASE_PATH',
-          'data/rednote.db',
-        ),
+        database: configService.get<string>('DATABASE_PATH', 'data/rednote.db'),
         entities: [User, Content],
         synchronize: true, // Auto-create tables (disable in production)
         logging: configService.get<string>('NODE_ENV') === 'development',

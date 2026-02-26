@@ -1,4 +1,5 @@
 import { AppSettings, Outline, ModelConfig } from "../types";
+import { authFetch, isLoggedIn } from "./auth";
 
 // Replaced GeminiService with generic ApiService
 export class ApiService {
@@ -22,6 +23,29 @@ export class ApiService {
     return `${base}${path}`;
   }
 
+  private buildSessionModelConfig(model: ModelConfig, isImageModel = false): {
+    provider: 'openai' | 'google';
+    modelName: string;
+    apiKey?: string;
+  } {
+    const isOpenAI = model.name.includes('gpt') || (isImageModel && model.name.includes('dall-e'));
+    const config: {
+      provider: 'openai' | 'google';
+      modelName: string;
+      apiKey?: string;
+    } = {
+      provider: isOpenAI ? 'openai' : 'google',
+      modelName: model.name,
+    };
+
+    const apiKey = model.apiKey?.trim();
+    if (apiKey) {
+      config.apiKey = apiKey;
+    }
+
+    return config;
+  }
+
   /**
    * Set model configuration in backend session
    */
@@ -35,20 +59,8 @@ export class ApiService {
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include', // Important: include credentials for session
         body: JSON.stringify({
-          textModelConfig: {
-            provider: textModel.name.includes('gpt') ? 'openai' : 'google',
-            modelName: textModel.name,
-            apiKey: textModel.apiKey || process.env.API_KEY,
-            baseUrl: textModel.baseUrl,
-            path: textModel.path,
-          },
-          imageModelConfig: {
-            provider: imageModel.name.includes('gpt') || imageModel.name.includes('dall-e') ? 'openai' : 'google',
-            modelName: imageModel.name,
-            apiKey: imageModel.apiKey || process.env.API_KEY,
-            baseUrl: imageModel.baseUrl,
-            path: imageModel.path,
-          },
+          textModelConfig: this.buildSessionModelConfig(textModel),
+          imageModelConfig: this.buildSessionModelConfig(imageModel, true),
           parameters: {
             temperature: this.settings.temperature,
             topP: this.settings.topP,
@@ -175,18 +187,24 @@ export class ApiService {
   /**
    * Save user configuration to backend
    */
-  async saveConfig(fingerprint: string, config: Partial<AppSettings>): Promise<boolean> {
+  async saveConfig(config: Partial<AppSettings>): Promise<boolean> {
+    if (!isLoggedIn()) {
+      console.warn('saveConfig skipped: user is not logged in');
+      return false;
+    }
+
     try {
-      const response = await fetch(this.getEndpoint('/api/config/save'), {
+      const sanitizedModels = config.models?.map(({ apiKey, baseUrl, path, ...rest }) => rest);
+
+      const response = await authFetch(this.getEndpoint('/api/config/save'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          fingerprint,
           config: {
             backendUrl: config.backendUrl,
             activeTextModelId: config.activeTextModelId,
             activeImageModelId: config.activeImageModelId,
-            models: config.models,
+            models: sanitizedModels,
             temperature: config.temperature,
             topP: config.topP,
           }
@@ -208,14 +226,16 @@ export class ApiService {
   /**
    * Get user configuration from backend
    */
-  async getConfig(fingerprint: string): Promise<any | null> {
+  async getConfig(): Promise<any | null> {
+    if (!isLoggedIn()) {
+      console.warn('getConfig skipped: user is not logged in');
+      return null;
+    }
+
     try {
-      const response = await fetch(
-        this.getEndpoint(`/api/config/get?fingerprint=${encodeURIComponent(fingerprint)}`),
-        {
-          method: 'GET',
-        }
-      );
+      const response = await authFetch(this.getEndpoint('/api/config/get'), {
+        method: 'GET',
+      });
 
       if (!response.ok) {
         throw new Error(`Failed to get config: ${response.statusText}`);

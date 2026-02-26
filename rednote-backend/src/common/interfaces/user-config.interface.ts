@@ -1,5 +1,6 @@
 export interface UserConfig {
-  fingerprint: string;
+  userId: string;
+  fingerprint?: string;
   backendUrl?: string;
   activeTextModelId?: string;
   activeImageModelId?: string;

@@ -11,7 +11,12 @@ import { AppModule } from '../src/app.module';
 import { DataSource, Repository } from 'typeorm';
 import * as bcrypt from 'bcrypt';
 
-export const JWT_SECRET = 'rednote-jwt-secret-change-in-production';
+export const JWT_SECRET = 'test-jwt-secret-1234567890-1234567890';
+export const SESSION_SECRET = 'test-session-secret-1234567890-1234567890';
+
+process.env.JWT_SECRET = process.env.JWT_SECRET || JWT_SECRET;
+process.env.SESSION_SECRET = process.env.SESSION_SECRET || SESSION_SECRET;
+process.env.NODE_ENV = process.env.NODE_ENV || 'test';
 
 export interface TestContext {
   app: INestApplication;
@@ -24,18 +29,35 @@ export interface TestContext {
 // Mock AI services to avoid real API calls
 export const mockLangchainService = {
   generateOutlines: jest.fn().mockResolvedValue([
-    { title: 'Test Outline 1', content: 'Test content 1', emoji: '📝', tags: ['test'] },
-    { title: 'Test Outline 2', content: 'Test content 2', emoji: '🎯', tags: ['test'] },
+    {
+      title: 'Test Outline 1',
+      content: 'Test content 1',
+      emoji: '📝',
+      tags: ['test'],
+    },
+    {
+      title: 'Test Outline 2',
+      content: 'Test content 2',
+      emoji: '🎯',
+      tags: ['test'],
+    },
   ]),
   generateOutlinesStream: jest.fn().mockResolvedValue([
-    { title: 'Test Outline 1', content: 'Test content 1', emoji: '📝', tags: ['test'] },
+    {
+      title: 'Test Outline 1',
+      content: 'Test content 1',
+      emoji: '📝',
+      tags: ['test'],
+    },
   ]),
   generateCaption: jest.fn().mockResolvedValue('Test caption for the outline'),
   generateImagePrompt: jest.fn().mockResolvedValue('A test image prompt'),
 };
 
 export const mockImageService = {
-  generateImage: jest.fn().mockResolvedValue('https://example.com/test-image.png'),
+  generateImage: jest
+    .fn()
+    .mockResolvedValue('https://example.com/test-image.png'),
 };
 
 export const mockQualityService = {
@@ -106,7 +128,11 @@ export async function createTestUser(
     plan: 'free',
     quotaLimit: 50,
     quotaUsed: 0,
-    quotaResetAt: new Date(new Date().getFullYear(), new Date().getMonth() + 1, 1),
+    quotaResetAt: new Date(
+      new Date().getFullYear(),
+      new Date().getMonth() + 1,
+      1,
+    ),
     ...overrides,
   });
   return ctx.userRepo.save(user);

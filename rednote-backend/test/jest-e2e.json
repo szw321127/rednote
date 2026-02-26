@@ -9,6 +9,7 @@
   "moduleNameMapper": {
     "^src/(.*)$": "<rootDir>/../src/$1"
   },
+  "setupFiles": ["<rootDir>/env.setup.ts"],
   "testTimeout": 30000,
   "maxWorkers": 1
 }

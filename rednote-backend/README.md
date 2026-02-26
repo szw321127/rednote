@@ -86,6 +86,14 @@ OPENAI_API_KEY=your_openai_api_key_here
 
 # CORS Origins (comma-separated)
 CORS_ORIGINS=http://localhost:5173,http://localhost:3000
+
+# Required secrets (>= 32 chars, defaults are rejected)
+JWT_SECRET=replace-with-a-random-32-plus-character-secret
+SESSION_SECRET=replace-with-another-random-32-plus-character-secret
+
+# Optional additional trusted AI hosts (comma-separated)
+# Defaults already include: api.openai.com, generativelanguage.googleapis.com
+AI_BASE_URL_ALLOWLIST=
 ```
 
 ### 获取 API 密钥
@@ -183,17 +191,17 @@ Content-Type: application/json
 }
 ```
 
-### 4. 保存用户配置
+### 4. 保存用户配置（需要登录）
 
 ```http
 POST /api/config/save
+Authorization: Bearer <access_token>
 Content-Type: application/json
 ```
 
 **请求体**:
 ```json
 {
-  "fingerprint": "abc123def456...",
   "config": {
     "backendUrl": "http://localhost:3000",
     "activeTextModelId": "default-gemini",
@@ -205,10 +213,13 @@ Content-Type: application/json
 }
 ```
 
-### 5. 获取用户配置
+> 配置按 `userId` 隔离存储，不再通过 fingerprint 读取他人配置。
+
+### 5. 获取当前用户配置（需要登录）
 
 ```http
-GET /api/config/get?fingerprint=abc123def456...
+GET /api/config/get
+Authorization: Bearer <access_token>
 ```
 
 **响应示例**:
@@ -217,18 +228,26 @@ GET /api/config/get?fingerprint=abc123def456...
   "success": true,
   "message": "Configuration retrieved successfully",
   "config": {
-    "fingerprint": "abc123def456...",
     "backendUrl": "http://localhost:3000",
-    "models": [...],
+    "models": [
+      {
+        "id": "default-gemini",
+        "name": "gemini",
+        "displayName": "Gemini"
+      }
+    ],
     "updatedAt": "2024-01-01T00:00:00.000Z"
   }
 }
 ```
 
-### 6. 配置统计
+> 出于安全考虑，接口会移除 `models[*].apiKey`，并且服务端在保存时也会剥离该字段（API Key 不做云端持久化）。
+
+### 6. 配置统计（需要登录）
 
 ```http
 GET /api/config/stats
+Authorization: Bearer <access_token>
 ```
 
 **响应示例**:
@@ -239,22 +258,9 @@ GET /api/config/stats
 }
 ```
 
-## 用户配置同步功能
+## 用户配置同步说明
 
-本系统支持基于浏览器指纹的用户配置同步功能。用户在前端设置页面配置的 API Key 等信息会自动同步到服务端，下次访问时会自动加载。
-
-### 工作原理
-1. 前端生成唯一的浏览器指纹
-2. 用户配置与指纹关联存储在服务端
-3. 下次访问时根据指纹自动加载配置
-
-### 特性
-- 无需登录即可识别用户
-- 配置自动同步到云端
-- 支持离线使用（本地 IndexedDB 备份）
-- 显示同步状态指示
-
-详细说明请查看 [CONFIG_SYNC.md](./CONFIG_SYNC.md)
+配置同步已改为**登录态绑定（userId）**，防止通过 fingerprint 枚举读取配置。前端可继续保留本地 IndexedDB 做离线缓存，在线时将配置同步到当前登录用户。
 
 ## 与前端集成
 

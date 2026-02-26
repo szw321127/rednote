@@ -9,6 +9,8 @@ import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { ModelConfig } from '../../common/interfaces/model-config.interface';
 import { Outline } from '../../common/interfaces/outline.interface';
+import { redactSecrets } from '../../common/logging/redaction.util';
+import { resolveAndValidateEndpoint } from '../../common/security/ai-endpoint-policy.util';
 
 @Injectable()
 export class LangchainService {
@@ -17,38 +19,39 @@ export class LangchainService {
   constructor(private configService: ConfigService) {}
 
   private getModel(config: ModelConfig) {
-    const apiKey = config.apiKey || this.getApiKeyForProvider(config.provider);
+    const endpoint = resolveAndValidateEndpoint(
+      config,
+      this.configService.get<string>('AI_BASE_URL_ALLOWLIST'),
+    );
+
+    const apiKey =
+      config.apiKey || this.getApiKeyForProvider(endpoint.provider);
     const temperature = config.temperature ?? 0.7;
     const topP = config.topP ?? 0.95;
 
-    if (config.provider === 'openai' || config.modelName.includes('gpt')) {
+    if (endpoint.provider === 'openai' || config.modelName.includes('gpt')) {
       this.logger.log(`Creating OpenAI model: ${config.modelName}`);
       return new ChatOpenAI({
         modelName: config.modelName,
         apiKey,
         temperature,
         topP,
-        configuration: config.baseUrl ? { baseURL: config.baseUrl } : undefined,
+        configuration: { baseURL: endpoint.baseUrl },
       });
-    } else {
-      this.logger.log(`Creating Google Gemini model: ${config.modelName}`);
-      const googleConfig: ConstructorParameters<
-        typeof ChatGoogleGenerativeAI
-      >[0] = {
-        model: config.modelName,
-        apiKey,
-        temperature,
-        topP,
-      };
-
-      // Add baseUrl support for Google Gemini
-      if (config.baseUrl) {
-        googleConfig.baseUrl = config.baseUrl;
-        this.logger.log(`Using custom baseUrl for Gemini: ${config.baseUrl}`);
-      }
-
-      return new ChatGoogleGenerativeAI(googleConfig);
     }
+
+    this.logger.log(`Creating Google Gemini model: ${config.modelName}`);
+    const googleConfig: ConstructorParameters<
+      typeof ChatGoogleGenerativeAI
+    >[0] = {
+      model: config.modelName,
+      apiKey,
+      temperature,
+      topP,
+      baseUrl: endpoint.baseUrl,
+    };
+
+    return new ChatGoogleGenerativeAI(googleConfig);
   }
 
   private getApiKeyForProvider(provider?: string): string {
@@ -111,8 +114,9 @@ JSON结构：
     for (let attempt = 0; attempt <= maxRetries; attempt++) {
       try {
         const result = await chain.invoke({ topic });
-        this.logger.log(
-          `Parsed result (attempt ${attempt + 1}): ${JSON.stringify(result)}`,
+        const outlineCount = Array.isArray(result) ? result.length : 0;
+        this.logger.debug(
+          `Parsed outlines successfully on attempt ${attempt + 1}, count=${outlineCount}`,
         );
 
         // Handle both direct array and wrapped response
@@ -129,32 +133,42 @@ JSON结构：
         } else if (
           result &&
           typeof result === 'object' &&
-          Array.isArray((result as any).outlines)
+          Array.isArray(result.outlines)
         ) {
-          outlines = (result as any).outlines;
+          outlines = result.outlines;
         } else if (
           result &&
           typeof result === 'object' &&
-          Array.isArray((result as any).items)
+          Array.isArray(result.items)
         ) {
-          outlines = (result as any).items;
+          outlines = result.items;
         } else {
           throw new Error('Unexpected response format');
         }
 
         return outlines.map((item: unknown) => {
           const obj = item as Record<string, unknown>;
+          const title = typeof obj.title === 'string' ? obj.title : '';
+          const content = typeof obj.content === 'string' ? obj.content : '';
+          const emoji = typeof obj.emoji === 'string' ? obj.emoji : '📝';
+          const tags = Array.isArray(obj.tags)
+            ? obj.tags
+                .filter((tag): tag is string => typeof tag === 'string')
+                .map((tag) => tag.trim())
+                .filter(Boolean)
+            : [];
+
           return {
-            title: String(obj.title || ''),
-            content: String(obj.content || ''),
-            emoji: String(obj.emoji || '📝'),
-            tags: Array.isArray(obj.tags) ? obj.tags.map((t) => String(t)) : [],
+            title,
+            content,
+            emoji,
+            tags,
           } as Outline;
         });
       } catch (error) {
         lastError = error instanceof Error ? error : new Error('Unknown error');
         this.logger.warn(
-          `Attempt ${attempt + 1} failed: ${lastError.message}`,
+          `Attempt ${attempt + 1} failed: ${redactSecrets(lastError.message)}`,
         );
 
         // If JSON parser fails on first attempt, switch to string parser for subsequent retries
@@ -226,7 +240,7 @@ JSON结构：
       onChunk(chunk);
     }
 
-    this.logger.log(`Full streamed result: ${fullText}`);
+    this.logger.debug(`Outline stream completed, chars=${fullText.length}`);
 
     try {
       // Parse JSON from string result
@@ -237,17 +251,29 @@ JSON结构：
       const outlines = JSON.parse(jsonMatch[0]) as unknown[];
       return outlines.map((item: unknown) => {
         const obj = item as Record<string, unknown>;
+        const title = typeof obj.title === 'string' ? obj.title : '';
+        const content = typeof obj.content === 'string' ? obj.content : '';
+        const emoji = typeof obj.emoji === 'string' ? obj.emoji : '📝';
+        const tags = Array.isArray(obj.tags)
+          ? obj.tags
+              .filter((tag): tag is string => typeof tag === 'string')
+              .map((tag) => tag.trim())
+              .filter(Boolean)
+          : [];
+
         return {
-          title: String(obj.title || ''),
-          content: String(obj.content || ''),
-          emoji: String(obj.emoji || '📝'),
-          tags: Array.isArray(obj.tags) ? obj.tags.map((t) => String(t)) : [],
+          title,
+          content,
+          emoji,
+          tags,
         } as Outline;
       });
     } catch (error) {
       const errorMessage =
         error instanceof Error ? error.message : 'Unknown error';
-      this.logger.error(`Failed to parse streamed outlines: ${errorMessage}`);
+      this.logger.error(
+        `Failed to parse streamed outlines: ${redactSecrets(errorMessage)}`,
+      );
       throw new Error('Failed to generate valid outlines');
     }
   }
@@ -286,9 +312,7 @@ JSON结构：
       tags: outline.tags.join(', '),
     });
 
-    this.logger.log(
-      `Generated caption (preview): ${caption.substring(0, 100)}...`,
-    );
+    this.logger.debug(`Generated caption length: ${caption.length}`);
 
     return caption;
   }
@@ -330,7 +354,7 @@ JSON结构：
       tags: outline.tags.join('、'),
     });
 
-    this.logger.log(`Generated image prompt: ${imagePrompt}`);
+    this.logger.debug(`Generated image prompt length: ${imagePrompt.length}`);
 
     return imagePrompt;
   }
