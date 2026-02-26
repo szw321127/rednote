@@ -13,6 +13,7 @@ import {
 import { ConfigStorageService } from './services/config-storage.service';
 import { SaveConfigDto } from './dto/save-config.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { UserConfig } from '../common/interfaces/user-config.interface';
 
 interface AuthenticatedRequest {
   user: {
@@ -36,8 +37,9 @@ export class ConfigStorageController {
     this.logger.log(`Received config save request for userId: ${userId}`);
 
     try {
+      const safeConfig = this.stripSensitiveConfig(dto.config);
       const savedConfig = this.configStorageService.saveConfig(userId, {
-        ...dto.config,
+        ...safeConfig,
         fingerprint: dto.fingerprint,
       });
 
@@ -91,23 +93,21 @@ export class ConfigStorageController {
     };
   }
 
-  private sanitizeConfig(config: unknown) {
-    const cloned = JSON.parse(JSON.stringify(config)) as {
-      models?: Array<Record<string, unknown>>;
-    };
+  private stripSensitiveConfig(config: unknown): Partial<UserConfig> {
+    const cloned = JSON.parse(JSON.stringify(config)) as Partial<UserConfig>;
 
     if (Array.isArray(cloned.models)) {
       cloned.models = cloned.models.map((model) => {
-        if ('apiKey' in model) {
-          return {
-            ...model,
-            apiKey: undefined,
-          };
-        }
-        return model;
+        const sanitizedModel = { ...model };
+        delete sanitizedModel.apiKey;
+        return sanitizedModel;
       });
     }
 
     return cloned;
+  }
+
+  private sanitizeConfig(config: unknown): Partial<UserConfig> {
+    return this.stripSensitiveConfig(config);
   }
 }

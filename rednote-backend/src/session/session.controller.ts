@@ -69,7 +69,10 @@ export class SessionController {
 
     // If apiKey is empty or empty string, get from env.
     // Env key autofill is only allowed for trusted allowlisted endpoints.
-    if ((!config.apiKey || config.apiKey.trim() === '') && endpoint.trusted) {
+    if (
+      (!config.apiKey || config.apiKey.trim() === '') &&
+      endpoint.envKeyAutofillAllowed
+    ) {
       const provider = endpoint.provider;
       let envKey: string | undefined;
 
@@ -91,6 +94,12 @@ export class SessionController {
         this.logger.log(`Using API key from env for provider: ${provider}`);
         return { ...config, apiKey: envKey };
       }
+    }
+
+    if (!config.apiKey && endpoint.trusted && !endpoint.envKeyAutofillAllowed) {
+      this.logger.warn(
+        `Skipping env API key autofill for non-default trusted host: ${endpoint.hostname}`,
+      );
     }
 
     return config;

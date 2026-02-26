@@ -13,11 +13,17 @@ export interface ResolvedEndpoint {
   path?: string;
   trusted: boolean;
   hostname: string;
+  envKeyAutofillAllowed: boolean;
 }
 
 const DEFAULT_BASE_URLS: Record<string, string> = {
   openai: 'https://api.openai.com',
   google: 'https://generativelanguage.googleapis.com',
+};
+
+const DEFAULT_PROVIDER_HOSTS: Record<string, string> = {
+  openai: 'api.openai.com',
+  google: 'generativelanguage.googleapis.com',
 };
 
 const PROVIDER_PATH_ALLOWLIST: Record<string, string[]> = {
@@ -172,11 +178,15 @@ export function resolveAndValidateEndpoint(
 
   assertPathAllowed(provider, modelConfig.path);
 
+  const envKeyAutofillAllowed =
+    trusted && DEFAULT_PROVIDER_HOSTS[provider] === hostname;
+
   return {
     provider,
     baseUrl: parsed.origin,
     path: modelConfig.path,
     trusted,
     hostname,
+    envKeyAutofillAllowed,
   };
 }
