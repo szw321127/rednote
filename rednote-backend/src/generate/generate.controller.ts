@@ -17,8 +17,8 @@ import { OptionalJwtGuard } from '../auth/guards/optional-jwt.guard';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Content } from '../database/entities/content.entity';
-import { User } from '../database/entities/user.entity';
 import { redactSecrets, summarizeText } from '../common/logging/redaction.util';
+import { QuotaService } from './quota.service';
 
 interface SessionData {
   textModelConfig?: ModelConfig;
@@ -35,10 +35,9 @@ export class GenerateController {
 
   constructor(
     private readonly generateService: GenerateService,
+    private readonly quotaService: QuotaService,
     @InjectRepository(Content)
     private readonly contentRepo: Repository<Content>,
-    @InjectRepository(User)
-    private readonly userRepo: Repository<User>,
   ) {}
 
   @Post('outline')
@@ -61,7 +60,7 @@ export class GenerateController {
 
     // Check quota if user is authenticated
     if (req.user?.sub) {
-      await this.checkAndDeductQuota(req.user.sub);
+      await this.quotaService.consumeQuota(req.user.sub);
     }
 
     const finalModelConfig: ModelConfig = {
@@ -115,7 +114,7 @@ export class GenerateController {
       }
 
       if (req.user?.sub) {
-        await this.checkAndDeductQuota(req.user.sub);
+        await this.quotaService.consumeQuota(req.user.sub);
       }
 
       const result = await this.generateService.generateContent(
@@ -134,29 +133,5 @@ export class GenerateController {
       );
       throw error;
     }
-  }
-
-  private async checkAndDeductQuota(userId: string): Promise<void> {
-    const user = await this.userRepo.findOne({ where: { id: userId } });
-    if (!user) return;
-
-    // Reset quota if needed
-    if (user.quotaResetAt && new Date() >= user.quotaResetAt) {
-      user.quotaUsed = 0;
-      user.quotaResetAt = new Date(
-        new Date().getFullYear(),
-        new Date().getMonth() + 1,
-        1,
-      );
-    }
-
-    if (user.quotaUsed >= user.quotaLimit) {
-      throw new BadRequestException(
-        `Monthly quota exceeded (${user.quotaLimit}). Please upgrade your plan.`,
-      );
-    }
-
-    user.quotaUsed += 1;
-    await this.userRepo.save(user);
   }
 }

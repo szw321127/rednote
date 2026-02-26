@@ -129,12 +129,14 @@ describe('Generate Module (e2e)', () => {
       const user = await createTestUser(ctx, { quotaUsed: 50, quotaLimit: 50 });
       const token = getAuthToken(ctx, user);
 
-      await request(server)
+      const res = await request(server)
         .post('/api/generate/outline')
         .set('Cookie', cookies)
         .set('Authorization', `Bearer ${token}`)
         .send({ topic: 'Over Quota' })
         .expect(400);
+
+      expect(res.body.code).toBe('QUOTA_EXCEEDED');
     });
 
     it('should allow unauthenticated users without quota check', async () => {
@@ -217,12 +219,14 @@ describe('Generate Module (e2e)', () => {
       const user = await createTestUser(ctx, { quotaUsed: 50, quotaLimit: 50 });
       const token = getAuthToken(ctx, user);
 
-      await request(server)
+      const res = await request(server)
         .post('/api/generate/content')
         .set('Cookie', cookies)
         .set('Authorization', `Bearer ${token}`)
         .send({ outline: testOutline })
         .expect(400);
+
+      expect(res.body.code).toBe('QUOTA_EXCEEDED');
     });
   });
 
@@ -244,12 +248,14 @@ describe('Generate Module (e2e)', () => {
       }
 
       // 4th request should fail
-      await request(server)
+      const overLimitRes = await request(server)
         .post('/api/generate/outline')
         .set('Cookie', cookies)
         .set('Authorization', `Bearer ${token}`)
         .send({ topic: 'Over limit' })
         .expect(400);
+
+      expect(overLimitRes.body.code).toBe('QUOTA_EXCEEDED');
 
       const updatedUser = await ctx.userRepo.findOne({
         where: { id: user.id },
@@ -276,6 +282,41 @@ describe('Generate Module (e2e)', () => {
         .set('Authorization', `Bearer ${token}`)
         .send({ topic: 'After Reset' })
         .expect(201);
+    });
+
+    it('should keep quota bounded under concurrent requests', async () => {
+      const server = ctx.app.getHttpServer() as App;
+      const cookies = await setupSession(server);
+      const user = await createTestUser(ctx, { quotaUsed: 0, quotaLimit: 1 });
+      const token = getAuthToken(ctx, user);
+
+      const settled = await Promise.allSettled(
+        Array.from({ length: 3 }, (_, i) =>
+          request(server)
+            .post('/api/generate/outline')
+            .set('Cookie', cookies)
+            .set('Authorization', `Bearer ${token}`)
+            .send({ topic: `Concurrent ${i}` }),
+        ),
+      );
+
+      const responses = settled
+        .filter((item): item is PromiseFulfilledResult<any> => item.status === 'fulfilled')
+        .map((item) => item.value);
+
+      expect(responses).toHaveLength(3);
+
+      const success = responses.filter((res) => res.status === 201);
+      const failed = responses.filter((res) => res.status === 400);
+
+      expect(success).toHaveLength(1);
+      expect(failed).toHaveLength(2);
+      failed.forEach((res) => {
+        expect(res.body.code).toBe('QUOTA_EXCEEDED');
+      });
+
+      const updated = await ctx.userRepo.findOne({ where: { id: user.id } });
+      expect(updated?.quotaUsed).toBe(1);
     });
   });
 });

@@ -4,11 +4,11 @@ import { GenerateController } from './generate.controller';
 import { GenerateService } from './generate.service';
 import { AiModule } from '../ai/ai.module';
 import { Content } from '../database/entities/content.entity';
-import { User } from '../database/entities/user.entity';
+import { QuotaService } from './quota.service';
 
 @Module({
-  imports: [AiModule, TypeOrmModule.forFeature([Content, User])],
+  imports: [AiModule, TypeOrmModule.forFeature([Content])],
   controllers: [GenerateController],
-  providers: [GenerateService],
+  providers: [GenerateService, QuotaService],
 })
 export class GenerateModule {}
