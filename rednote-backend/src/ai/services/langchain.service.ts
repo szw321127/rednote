@@ -66,6 +66,114 @@ export class LangchainService {
     return this.configService.get<string>('GOOGLE_API_KEY', '');
   }
 
+  private extractJsonArrayFromText(rawText: string): unknown[] {
+    const trimmed = rawText.trim();
+    if (!trimmed) {
+      throw new AiOutputValidationException(
+        'outlines',
+        'AI 未返回任何大纲内容，请重试。',
+      );
+    }
+
+    const cleaned = trimmed
+      .replace(/^```(?:json)?\s*\n?/i, '')
+      .replace(/\n?```\s*$/i, '')
+      .trim();
+
+    const startIndex = cleaned.indexOf('[');
+    const endIndex = cleaned.lastIndexOf(']');
+
+    if (startIndex === -1) {
+      throw new AiOutputValidationException(
+        'outlines',
+        'AI 返回的大纲不是有效 JSON 数组，请重试。',
+      );
+    }
+
+    if (endIndex === -1 || endIndex < startIndex) {
+      throw new AiOutputValidationException(
+        'outlines',
+        'AI 返回的大纲 JSON 不完整，请重试。',
+      );
+    }
+
+    const jsonText = cleaned.slice(startIndex, endIndex + 1);
+
+    try {
+      const parsed = JSON.parse(jsonText) as unknown;
+      if (!Array.isArray(parsed)) {
+        throw new AiOutputValidationException(
+          'outlines',
+          'AI 返回的大纲格式异常，请重试。',
+        );
+      }
+
+      return parsed;
+    } catch (error) {
+      if (error instanceof AiOutputValidationException) {
+        throw error;
+      }
+
+      const message =
+        error instanceof Error ? error.message.toLowerCase() : 'invalid json';
+
+      if (message.includes('unexpected end of json input')) {
+        throw new AiOutputValidationException(
+          'outlines',
+          'AI 返回的大纲 JSON 不完整，请重试。',
+        );
+      }
+
+      throw new AiOutputValidationException(
+        'outlines',
+        'AI 返回的大纲 JSON 解析失败，请重试。',
+      );
+    }
+  }
+
+  private normalizeOutlinesResult(result: unknown): unknown[] {
+    if (typeof result === 'string') {
+      return this.extractJsonArrayFromText(result);
+    }
+
+    if (Array.isArray(result)) {
+      return result;
+    }
+
+    if (
+      result &&
+      typeof result === 'object' &&
+      Array.isArray((result as { outlines?: unknown[] }).outlines)
+    ) {
+      return (result as { outlines: unknown[] }).outlines;
+    }
+
+    if (
+      result &&
+      typeof result === 'object' &&
+      Array.isArray((result as { items?: unknown[] }).items)
+    ) {
+      return (result as { items: unknown[] }).items;
+    }
+
+    throw new AiOutputValidationException(
+      'outlines',
+      'AI 返回的大纲格式不符合要求，请重试。',
+    );
+  }
+
+  private ensureNonEmptyText(
+    value: string,
+    target: 'caption' | 'imagePrompt',
+    message: string,
+  ): string {
+    if (!value || !value.trim()) {
+      throw new AiOutputValidationException(target, message);
+    }
+
+    return value.trim();
+  }
+
   async generateOutlines(
     topic: string,
     modelConfig: ModelConfig,
@@ -126,33 +234,7 @@ JSON结构：
           `Parsed outlines successfully on attempt ${attempt + 1}, count=${outlineCount}`,
         );
 
-        // Handle both direct array and wrapped response
-        let outlines: unknown[];
-        if (typeof result === 'string') {
-          // StringOutputParser returned a string — extract JSON array from it
-          const jsonMatch = result.match(/\[[\s\S]*\]/);
-          if (!jsonMatch) {
-            throw new Error('No JSON array found in string response');
-          }
-          outlines = JSON.parse(jsonMatch[0]) as unknown[];
-        } else if (Array.isArray(result)) {
-          outlines = result;
-        } else if (
-          result &&
-          typeof result === 'object' &&
-          Array.isArray(result.outlines)
-        ) {
-          outlines = result.outlines;
-        } else if (
-          result &&
-          typeof result === 'object' &&
-          Array.isArray(result.items)
-        ) {
-          outlines = result.items;
-        } else {
-          throw new Error('Unexpected response format');
-        }
-
+        const outlines = this.normalizeOutlinesResult(result);
         return parseOutlineOutput(outlines);
       } catch (error) {
         lastError = error instanceof Error ? error : new Error('Unknown error');
@@ -174,7 +256,10 @@ JSON结构：
     this.logger.error(
       `Failed to parse outlines after ${maxRetries + 1} attempts`,
     );
-    throw new AiOutputValidationException('outlines');
+    throw new AiOutputValidationException(
+      'outlines',
+      'AI 多次返回不合规的大纲内容，请重试或切换模型。',
+    );
   }
 
   async generateOutlinesStream(
@@ -233,12 +318,7 @@ JSON结构：
     this.logger.debug(`Outline stream completed, chars=${fullText.length}`);
 
     try {
-      // Parse JSON from string result
-      const jsonMatch = fullText.match(/\[[\s\S]*\]/);
-      if (!jsonMatch) {
-        throw new Error('No JSON array found in response');
-      }
-      const outlines = JSON.parse(jsonMatch[0]) as unknown[];
+      const outlines = this.extractJsonArrayFromText(fullText);
       return parseOutlineOutput(outlines);
     } catch (error) {
       const errorMessage =
@@ -246,7 +326,15 @@ JSON结构：
       this.logger.error(
         `Failed to parse streamed outlines: ${summarizeText(redactSecrets(errorMessage), 220)}`,
       );
-      throw new AiOutputValidationException('outlines');
+
+      if (error instanceof AiOutputValidationException) {
+        throw error;
+      }
+
+      throw new AiOutputValidationException(
+        'outlines',
+        'AI 返回的大纲内容不完整，请重试。',
+      );
     }
   }
 
@@ -286,9 +374,15 @@ JSON结构：
       tags: outline.tags.join(', '),
     });
 
-    this.logger.debug(`Generated caption length: ${caption.length}`);
+    const normalizedCaption = this.ensureNonEmptyText(
+      caption,
+      'caption',
+      'AI 返回了空文案内容，请重试。',
+    );
 
-    return caption;
+    this.logger.debug(`Generated caption length: ${normalizedCaption.length}`);
+
+    return normalizedCaption;
   }
 
   async generateImagePrompt(
@@ -330,8 +424,16 @@ JSON结构：
       tags: outline.tags.join('、'),
     });
 
-    this.logger.debug(`Generated image prompt length: ${imagePrompt.length}`);
+    const normalizedImagePrompt = this.ensureNonEmptyText(
+      imagePrompt,
+      'imagePrompt',
+      'AI 返回了空图片提示词，请重试。',
+    );
 
-    return imagePrompt;
+    this.logger.debug(
+      `Generated image prompt length: ${normalizedImagePrompt.length}`,
+    );
+
+    return normalizedImagePrompt;
   }
 }

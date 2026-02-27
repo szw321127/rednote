@@ -1,7 +1,7 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
-import { APP_GUARD } from '@nestjs/core';
+import { APP_FILTER, APP_GUARD } from '@nestjs/core';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { DatabaseModule } from './database/database.module';
@@ -13,6 +13,7 @@ import { ConfigStorageModule } from './config-storage/config-storage.module';
 import { SessionModule } from './session/session.module';
 import { StatsModule } from './stats/stats.module';
 import { validateEnv } from './config/env.validation';
+import { ApiExceptionFilter } from './common/filters/api-exception.filter';
 
 @Module({
   imports: [
@@ -37,6 +38,10 @@ import { validateEnv } from './config/env.validation';
   controllers: [AppController],
   providers: [
     AppService,
+    {
+      provide: APP_FILTER,
+      useClass: ApiExceptionFilter,
+    },
     {
       provide: APP_GUARD,
       useClass: ThrottlerGuard,

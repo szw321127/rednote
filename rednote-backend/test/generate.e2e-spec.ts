@@ -7,8 +7,10 @@ import {
   createTestUser,
   getAuthToken,
   resetMocks,
+  mockImageService,
   mockLangchainService,
 } from './test-setup';
+import { AiOutputValidationException } from '../src/ai/exceptions/ai-output-validation.exception';
 
 describe('Generate Module (e2e)', () => {
   let ctx: TestContext;
@@ -106,10 +108,13 @@ describe('Generate Module (e2e)', () => {
     });
 
     it('should reject when no session config', async () => {
-      await request(ctx.app.getHttpServer() as App)
+      const res = await request(ctx.app.getHttpServer() as App)
         .post('/api/generate/outline')
         .send({ topic: 'No Config Topic' })
         .expect(400);
+
+      expect(res.body.code).toBe('SESSION_MODEL_CONFIG_MISSING');
+      expect(res.body.message).toContain('模型配置');
     });
 
     it('should reject missing topic', async () => {
@@ -121,6 +126,44 @@ describe('Generate Module (e2e)', () => {
         .set('Cookie', cookies)
         .send({})
         .expect(400);
+    });
+
+    it('should return retryable timeout error when upstream times out', async () => {
+      const server = ctx.app.getHttpServer() as App;
+      const cookies = await setupSession(server);
+      mockLangchainService.generateOutlines.mockRejectedValueOnce(
+        new Error('request timed out after 30s'),
+      );
+
+      const res = await request(server)
+        .post('/api/generate/outline')
+        .set('Cookie', cookies)
+        .send({ topic: 'Timeout Topic' })
+        .expect(504);
+
+      expect(res.body.code).toBe('AI_UPSTREAM_TIMEOUT');
+      expect(res.body.retryable).toBe(true);
+    });
+
+    it('should preserve AI output validation error details', async () => {
+      const server = ctx.app.getHttpServer() as App;
+      const cookies = await setupSession(server);
+      mockLangchainService.generateOutlines.mockRejectedValueOnce(
+        new AiOutputValidationException(
+          'outlines',
+          'AI 返回的大纲格式不完整，请重试。',
+        ),
+      );
+
+      const res = await request(server)
+        .post('/api/generate/outline')
+        .set('Cookie', cookies)
+        .send({ topic: 'Schema Topic' })
+        .expect(502);
+
+      expect(res.body.code).toBe('AI_OUTPUT_INVALID');
+      expect(res.body.message).toContain('格式不完整');
+      expect(res.body.retryable).toBe(true);
     });
 
     it('should reject when quota exceeded', async () => {
@@ -196,10 +239,13 @@ describe('Generate Module (e2e)', () => {
     });
 
     it('should reject when no session config', async () => {
-      await request(ctx.app.getHttpServer() as App)
+      const res = await request(ctx.app.getHttpServer() as App)
         .post('/api/generate/content')
         .send({ outline: testOutline })
         .expect(400);
+
+      expect(res.body.code).toBe('SESSION_MODEL_CONFIG_MISSING');
+      expect(res.body.message).toContain('模型配置');
     });
 
     it('should reject missing outline', async () => {
@@ -228,6 +274,40 @@ describe('Generate Module (e2e)', () => {
           },
         })
         .expect(400);
+    });
+
+    it('should map empty upstream response to retryable error', async () => {
+      const server = ctx.app.getHttpServer() as App;
+      const cookies = await setupSession(server);
+      mockImageService.generateImage.mockRejectedValueOnce(
+        new Error('No image data in Gemini response'),
+      );
+
+      const res = await request(server)
+        .post('/api/generate/content')
+        .set('Cookie', cookies)
+        .send({ outline: testOutline })
+        .expect(502);
+
+      expect(res.body.code).toBe('AI_UPSTREAM_EMPTY_RESPONSE');
+      expect(res.body.retryable).toBe(true);
+    });
+
+    it('should return non-retryable config error when provider key is missing', async () => {
+      const server = ctx.app.getHttpServer() as App;
+      const cookies = await setupSession(server);
+      mockImageService.generateImage.mockRejectedValueOnce(
+        new Error('Google API key is not configured'),
+      );
+
+      const res = await request(server)
+        .post('/api/generate/content')
+        .set('Cookie', cookies)
+        .send({ outline: testOutline })
+        .expect(400);
+
+      expect(res.body.code).toBe('AI_PROVIDER_KEY_MISSING');
+      expect(res.body.retryable).toBe(false);
     });
 
     it('should reject when quota exceeded', async () => {

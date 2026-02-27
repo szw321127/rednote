@@ -1,5 +1,4 @@
 import {
-  BadRequestException,
   Body,
   Controller,
   Logger,
@@ -19,6 +18,10 @@ import { Repository } from 'typeorm';
 import { Content } from '../database/entities/content.entity';
 import { redactSecrets, summarizeText } from '../common/logging/redaction.util';
 import { QuotaService } from './quota.service';
+import {
+  mapGenerateErrorToHttpException,
+  sessionModelConfigMissingException,
+} from './utils/ai-error-mapper.util';
 
 interface SessionData {
   textModelConfig?: ModelConfig;
@@ -49,49 +52,56 @@ export class GenerateController {
   ) {
     this.logger.log('Received outline generation request');
 
-    const modelConfig = session.textModelConfig;
-    const parameters = session.parameters;
+    try {
+      const modelConfig = session.textModelConfig;
+      const parameters = session.parameters;
 
-    if (!modelConfig) {
-      throw new BadRequestException(
-        'Model configuration not found in session. Please configure your models in settings first.',
+      if (!modelConfig) {
+        throw sessionModelConfigMissingException('outline');
+      }
+
+      // Check quota if user is authenticated
+      if (req.user?.sub) {
+        await this.quotaService.consumeQuota(req.user.sub);
+      }
+
+      const finalModelConfig: ModelConfig = {
+        ...modelConfig,
+        temperature: parameters?.temperature ?? modelConfig.temperature,
+        topP: parameters?.topP ?? modelConfig.topP,
+      };
+
+      const result = await this.generateService.generateOutlines(
+        dto.topic,
+        finalModelConfig,
       );
+
+      // Persist content if user is authenticated
+      if (req.user?.sub) {
+        await this.contentRepo.save({
+          userId: req.user.sub,
+          topic: dto.topic,
+          status: 'outline',
+          outlines: result.map((o: any) => ({
+            title: o.title,
+            content: o.content,
+            emoji: o.emoji,
+            tags: o.tags,
+          })),
+          textModel: modelConfig.modelName,
+        });
+      }
+
+      this.logger.log('Outline generation completed');
+      return result;
+    } catch (error) {
+      const errorMessage =
+        error instanceof Error ? error.message : 'Unknown error';
+      this.logger.error(
+        `Failed to generate outlines: ${summarizeText(redactSecrets(errorMessage), 200)}`,
+      );
+      throw mapGenerateErrorToHttpException(error, 'outline');
     }
-
-    // Check quota if user is authenticated
-    if (req.user?.sub) {
-      await this.quotaService.consumeQuota(req.user.sub);
-    }
-
-    const finalModelConfig: ModelConfig = {
-      ...modelConfig,
-      temperature: parameters?.temperature ?? modelConfig.temperature,
-      topP: parameters?.topP ?? modelConfig.topP,
-    };
-
-    const result = await this.generateService.generateOutlines(
-      dto.topic,
-      finalModelConfig,
-    );
-
-    // Persist content if user is authenticated
-    if (req.user?.sub) {
-      await this.contentRepo.save({
-        userId: req.user.sub,
-        topic: dto.topic,
-        status: 'outline',
-        outlines: result.map((o: any) => ({
-          title: o.title,
-          content: o.content,
-          emoji: o.emoji,
-          tags: o.tags,
-        })),
-        textModel: modelConfig.modelName,
-      });
-    }
-
-    this.logger.log('Outline generation completed');
-    return result;
   }
 
   @Post('content')
@@ -108,9 +118,7 @@ export class GenerateController {
       const imageModelConfig = session.imageModelConfig;
 
       if (!textModelConfig || !imageModelConfig) {
-        throw new BadRequestException(
-          'Model configuration not found in session. Please configure your models in settings first.',
-        );
+        throw sessionModelConfigMissingException('content');
       }
 
       if (req.user?.sub) {
@@ -202,7 +210,7 @@ export class GenerateController {
       this.logger.error(
         `Failed to generate content: ${summarizeText(redactSecrets(errorMessage), 200)}`,
       );
-      throw error;
+      throw mapGenerateErrorToHttpException(error, 'content');
     }
   }
 }
