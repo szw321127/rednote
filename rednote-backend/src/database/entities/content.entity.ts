@@ -45,7 +45,7 @@ export class Content {
   imageModel: string;
 
   @Column({ type: 'float', nullable: true })
-  qualityScore: number;
+  qualityScore?: number | null;
 
   @CreateDateColumn()
   createdAt: Date;

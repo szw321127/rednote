@@ -26,6 +26,7 @@ describe('StatsService', () => {
 
     mockContentRepo = {
       count: jest.fn(),
+      find: jest.fn(),
     };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -54,14 +55,18 @@ describe('StatsService', () => {
         plan: 'free',
         createdAt: new Date(),
       });
-      mockContentRepo.count
-        .mockResolvedValueOnce(10) // total
-        .mockResolvedValueOnce(7); // completed
+      mockContentRepo.count.mockResolvedValueOnce(10); // total
+      mockContentRepo.find.mockResolvedValueOnce([
+        { id: 'c1', status: 'outline', completedContents: null },
+        { id: 'c2', status: 'completed', completedContents: null },
+        { id: 'c3', status: 'completed', completedContents: [{}, {}] },
+      ]);
 
       const result = await service.getUserStats('uuid-1');
       expect(result).toBeDefined();
       expect(result!.totalGenerated).toBe(10);
-      expect(result!.completedPosts).toBe(7);
+      // c2 counts as 1, c3 counts as 2 -> total 3
+      expect(result!.completedPosts).toBe(3);
       expect(result!.quotaRemaining).toBe(45);
     });
   });

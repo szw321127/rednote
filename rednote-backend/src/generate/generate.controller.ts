@@ -123,6 +123,77 @@ export class GenerateController {
         imageModelConfig,
       );
 
+      // Persist completed content if user is authenticated
+      if (req.user?.sub) {
+        const now = Date.now();
+
+        // Best-effort: attach to the most recent outline record if possible (same user)
+        const recent = await this.contentRepo
+          .createQueryBuilder('c')
+          .where('c.userId = :userId', { userId: req.user.sub })
+          .orderBy('c.createdAt', 'DESC')
+          .limit(20)
+          .getMany();
+
+        const match = recent.find((c) => {
+          if (!Array.isArray(c.outlines)) return false;
+          return c.outlines.some((o) => o?.title === dto.outline.title);
+        });
+
+        const target = match ?? recent[0] ?? null;
+        const overall = result.qualityScore?.overall;
+
+        if (target) {
+          const completed = Array.isArray(target.completedContents)
+            ? [...target.completedContents]
+            : [];
+
+          completed.push({
+            outlineTitle: dto.outline.title,
+            imageUrl: result.imageUrl,
+            caption: result.caption,
+            createdAt: now,
+          });
+
+          await this.contentRepo.save({
+            id: target.id,
+            status: 'completed',
+            completedContents: completed,
+            textModel: textModelConfig.modelName,
+            imageModel: imageModelConfig.modelName,
+            qualityScore:
+              typeof overall === 'number'
+                ? overall
+                : (target.qualityScore ?? undefined),
+          });
+        } else {
+          await this.contentRepo.save({
+            userId: req.user.sub,
+            topic: dto.outline.title,
+            status: 'completed',
+            outlines: [
+              {
+                title: dto.outline.title,
+                content: dto.outline.content,
+                emoji: dto.outline.emoji,
+                tags: dto.outline.tags,
+              },
+            ],
+            completedContents: [
+              {
+                outlineTitle: dto.outline.title,
+                imageUrl: result.imageUrl,
+                caption: result.caption,
+                createdAt: now,
+              },
+            ],
+            textModel: textModelConfig.modelName,
+            imageModel: imageModelConfig.modelName,
+            qualityScore: typeof overall === 'number' ? overall : undefined,
+          });
+        }
+      }
+
       this.logger.log('Content generation completed');
       return result;
     } catch (error) {

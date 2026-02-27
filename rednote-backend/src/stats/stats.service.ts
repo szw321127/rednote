@@ -23,9 +23,21 @@ export class StatsService {
       where: { userId },
     });
 
-    const completedContents = await this.contentRepo.count({
-      where: { userId, status: 'completed' },
+    const rows = await this.contentRepo.find({
+      where: { userId },
+      select: {
+        id: true,
+        status: true,
+        completedContents: true,
+      },
     });
+
+    const completedContents = rows.reduce((acc, c) => {
+      if (Array.isArray(c.completedContents))
+        return acc + c.completedContents.length;
+      if (c.status === 'completed') return acc + 1;
+      return acc;
+    }, 0);
 
     return {
       totalGenerated: totalContents,
