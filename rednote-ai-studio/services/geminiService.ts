@@ -1,5 +1,6 @@
 import { AppSettings, Outline, ModelConfig } from "../types";
 import { authFetch, isLoggedIn } from "./auth";
+import { parseJsonResponse } from "./http";
 
 // Replaced GeminiService with generic ApiService
 export class ApiService {
@@ -68,12 +69,8 @@ export class ApiService {
         }),
       });
 
-      if (!response.ok) {
-        throw new Error(`Failed to set model config: ${response.statusText}`);
-      }
-
-      const result = await response.json();
-      return result.success;
+      const result = await parseJsonResponse<{ success: boolean }>(response);
+      return !!result.success;
     } catch (e) {
       console.error("Failed to set model config:", e);
       return false;
@@ -130,8 +127,9 @@ export class ApiService {
         const parsed = JSON.parse(jsonString);
         return parsed.map((item: any, index: number) => ({ ...item, id: `outline-${Date.now()}-${index}` }));
       } catch (e) {
-        console.warn("Failed to parse JSON from stream, returning raw text as one item if possible", e);
-        return [];
+        // Surface a friendly, retryable error instead of leaking "Unexpected end of JSON input"
+        console.warn("Failed to parse JSON from stream", e);
+        throw new Error('后端返回的大纲数据不完整（JSON解析失败），请重试。');
       }
 
     } catch (error) {
@@ -156,11 +154,7 @@ export class ApiService {
       body: JSON.stringify(payload),
     });
 
-    if (!response.ok) {
-        throw new Error(`Backend error: ${response.statusText}`);
-    }
-
-    const result = await response.json();
+    const result = await parseJsonResponse<{ imageUrl: string; caption: string }>(response);
     return {
         imageUrl: result.imageUrl,
         caption: result.caption
@@ -211,12 +205,8 @@ export class ApiService {
         }),
       });
 
-      if (!response.ok) {
-        throw new Error(`Failed to save config: ${response.statusText}`);
-      }
-
-      const result = await response.json();
-      return result.success;
+      const result = await parseJsonResponse<{ success: boolean }>(response);
+      return !!result.success;
     } catch (e) {
       console.error("Failed to save config:", e);
       return false;
@@ -237,12 +227,8 @@ export class ApiService {
         method: 'GET',
       });
 
-      if (!response.ok) {
-        throw new Error(`Failed to get config: ${response.statusText}`);
-      }
-
-      const result = await response.json();
-      return result.success ? result.config : null;
+      const result = await parseJsonResponse<{ success: boolean; config?: any }>(response);
+      return result.success ? (result.config ?? null) : null;
     } catch (e) {
       console.error("Failed to get config:", e);
       return null;
