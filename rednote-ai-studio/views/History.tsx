@@ -52,6 +52,7 @@ const History: React.FC<HistoryProps> = ({ onRestorePost }) => {
   const handleRestore = (e: React.MouseEvent, post: GeneratedPost) => {
     e.stopPropagation();
     onRestorePost(post);
+    navigate(`/generator/${post.id}`);
   };
 
   if (loading) {

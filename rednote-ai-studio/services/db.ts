@@ -50,6 +50,19 @@ export const getHistory = async (): Promise<GeneratedPost[]> => {
   });
 };
 
+export const getHistoryById = async (id: string): Promise<GeneratedPost | null> => {
+  const db = await openDB();
+  return new Promise((resolve, reject) => {
+    const transaction = db.transaction(STORE_HISTORY, 'readonly');
+    const store = transaction.objectStore(STORE_HISTORY);
+    const request = store.get(id);
+    request.onsuccess = () => {
+      resolve((request.result as GeneratedPost | undefined) ?? null);
+    };
+    request.onerror = () => reject(request.error);
+  });
+};
+
 export const deleteHistory = async (id: string): Promise<void> => {
   const db = await openDB();
   return new Promise((resolve, reject) => {

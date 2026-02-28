@@ -35,7 +35,7 @@ const Sidebar: React.FC<SidebarProps> = ({ user, onLogout }) => {
           <NavLink
             key={item.to}
             to={item.to}
-            end={item.to !== '/history'}
+            end={item.to === '/settings'}
             className={({ isActive }) =>
               `group relative w-full flex items-center px-3 md:px-4 py-3 rounded-xl transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-xhs-red/30 focus-visible:ring-offset-2 focus-visible:ring-offset-xhs-surface ${
                 isActive
