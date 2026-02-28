@@ -28,12 +28,16 @@ export class ApiService {
     provider: 'openai' | 'google';
     modelName: string;
     apiKey?: string;
+    baseUrl?: string;
+    path?: string;
   } {
     const isOpenAI = model.name.includes('gpt') || (isImageModel && model.name.includes('dall-e'));
     const config: {
       provider: 'openai' | 'google';
       modelName: string;
       apiKey?: string;
+      baseUrl?: string;
+      path?: string;
     } = {
       provider: isOpenAI ? 'openai' : 'google',
       modelName: model.name,
@@ -42,6 +46,16 @@ export class ApiService {
     const apiKey = model.apiKey?.trim();
     if (apiKey) {
       config.apiKey = apiKey;
+    }
+
+    const baseUrl = model.baseUrl?.trim();
+    if (baseUrl) {
+      config.baseUrl = baseUrl;
+    }
+
+    const path = model.path?.trim();
+    if (path) {
+      config.path = path;
     }
 
     return config;
@@ -188,7 +202,7 @@ export class ApiService {
     }
 
     try {
-      const sanitizedModels = config.models?.map(({ apiKey, baseUrl, path, ...rest }) => rest);
+      const sanitizedModels = config.models?.map(({ apiKey, ...rest }) => rest);
 
       const response = await authFetch(this.getEndpoint('/api/config/save'), {
         method: 'POST',

@@ -29,17 +29,15 @@ export class ImageService {
     const normalizedProvider = (modelConfig.provider || '').toLowerCase();
     const provider =
       normalizedProvider === 'gemini' ? 'google' : normalizedProvider;
-    const apiKey = modelConfig.apiKey || this.getApiKeyForProvider(provider);
-
     if (provider === 'openai' || modelConfig.modelName.includes('dall-e')) {
-      return this.generateWithDallE(prompt, apiKey, {
+      return this.generateWithDallE(prompt, {
         ...modelConfig,
         provider: 'openai',
       });
     }
 
     // Use SDK method by default
-    return this.generateWithGemini(prompt, apiKey, {
+    return this.generateWithGemini(prompt, {
       ...modelConfig,
       provider: 'google',
     });
@@ -47,7 +45,6 @@ export class ImageService {
 
   private async generateWithDallE(
     prompt: string,
-    apiKey: string,
     modelConfig: ModelConfig,
   ): Promise<string> {
     this.logger.log('Generating image with DALL-E');
@@ -64,6 +61,17 @@ export class ImageService {
 
     const requestPath = endpoint.path || defaultPath;
     const url = `${endpoint.baseUrl}${requestPath}`;
+
+    const configuredApiKey = modelConfig.apiKey?.trim();
+    const apiKey =
+      configuredApiKey ||
+      (endpoint.envKeyAutofillAllowed
+        ? this.getApiKeyForProvider(endpoint.provider)
+        : '');
+
+    if (!apiKey) {
+      throw new Error('API key is required for this model endpoint');
+    }
 
     try {
       const response = await fetch(url, {
@@ -108,14 +116,9 @@ export class ImageService {
 
   private async generateWithGeminiFetch(
     prompt: string,
-    apiKey: string,
     modelConfig: ModelConfig,
   ): Promise<string> {
     this.logger.log('Generating image with Gemini using Fetch API');
-
-    if (!apiKey) {
-      throw new Error('Google API key is not configured');
-    }
 
     try {
       const modelName =
@@ -132,6 +135,17 @@ export class ImageService {
 
       const requestPath = endpoint.path || defaultPath;
       const url = `${endpoint.baseUrl}${requestPath}`;
+
+      const configuredApiKey = modelConfig.apiKey?.trim();
+      const apiKey =
+        configuredApiKey ||
+        (endpoint.envKeyAutofillAllowed
+          ? this.getApiKeyForProvider(endpoint.provider)
+          : '');
+
+      if (!apiKey) {
+        throw new Error('API key is required for this model endpoint');
+      }
 
       const temperature = modelConfig.temperature ?? 0.7;
       const topP = modelConfig.topP ?? 0.95;
@@ -210,20 +224,26 @@ export class ImageService {
 
   private async generateWithGemini(
     prompt: string,
-    apiKey: string,
     modelConfig: ModelConfig,
   ): Promise<string> {
     this.logger.log('Generating image with Gemini using SDK');
-
-    if (!apiKey) {
-      throw new Error('Google API key is not configured');
-    }
 
     try {
       const endpoint = resolveAndValidateEndpoint(
         { ...modelConfig, provider: 'google' },
         this.configService.get<string>('AI_BASE_URL_ALLOWLIST'),
       );
+
+      const configuredApiKey = modelConfig.apiKey?.trim();
+      const apiKey =
+        configuredApiKey ||
+        (endpoint.envKeyAutofillAllowed
+          ? this.getApiKeyForProvider(endpoint.provider)
+          : '');
+
+      if (!apiKey) {
+        throw new Error('API key is required for this model endpoint');
+      }
 
       const sdkConfig: GoogleGenAIOptions = {
         apiKey,

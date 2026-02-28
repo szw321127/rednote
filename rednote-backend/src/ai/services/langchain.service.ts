@@ -29,8 +29,16 @@ export class LangchainService {
       this.configService.get<string>('AI_BASE_URL_ALLOWLIST'),
     );
 
+    const configuredApiKey = config.apiKey?.trim();
     const apiKey =
-      config.apiKey || this.getApiKeyForProvider(endpoint.provider);
+      configuredApiKey ||
+      (endpoint.envKeyAutofillAllowed
+        ? this.getApiKeyForProvider(endpoint.provider)
+        : '');
+
+    if (!apiKey) {
+      throw new Error('API key is required for this model endpoint');
+    }
     const temperature = config.temperature ?? 0.7;
     const topP = config.topP ?? 0.95;
 

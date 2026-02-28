@@ -170,12 +170,6 @@ export function resolveAndValidateEndpoint(
   const hostWithPort = parsed.port ? `${hostname}:${parsed.port}` : hostname;
   const trusted = allowlist.has(hostname) || allowlist.has(hostWithPort);
 
-  if (!trusted) {
-    throw new BadRequestException(
-      `baseUrl host is not allowlisted: ${hostname}. Configure AI_BASE_URL_ALLOWLIST to permit additional hosts.`,
-    );
-  }
-
   assertPathAllowed(provider, modelConfig.path);
 
   const envKeyAutofillAllowed =

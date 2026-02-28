@@ -39,13 +39,15 @@ describe('ai-endpoint-policy.util', () => {
     ).toThrow(BadRequestException);
   });
 
-  it('should reject unallowlisted host', () => {
-    expect(() =>
-      resolveAndValidateEndpoint({
-        provider: 'openai',
-        baseUrl: 'https://evil.example.com',
-      }),
-    ).toThrow(BadRequestException);
+  it('should allow unallowlisted host but mark untrusted', () => {
+    const result = resolveAndValidateEndpoint({
+      provider: 'openai',
+      baseUrl: 'https://evil.example.com',
+    });
+
+    expect(result.baseUrl).toBe('https://evil.example.com');
+    expect(result.trusted).toBe(false);
+    expect(result.envKeyAutofillAllowed).toBe(false);
   });
 
   it('should allow configured host but disable env autofill for non-default host', () => {

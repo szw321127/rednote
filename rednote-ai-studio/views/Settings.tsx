@@ -29,10 +29,27 @@ const EMPTY_MODEL_FORM: Partial<ModelConfig> = {
   name: '',
   displayName: '',
   apiKey: '',
+  baseUrl: '',
+  path: '',
+};
+
+const normalizeModel = (model: ModelConfig): ModelConfig => {
+  const normalizedApiKey = model.apiKey?.trim();
+  const normalizedBaseUrl = model.baseUrl?.trim();
+  const normalizedPath = model.path?.trim();
+
+  return {
+    ...model,
+    name: model.name.trim(),
+    displayName: model.displayName.trim(),
+    apiKey: normalizedApiKey || undefined,
+    baseUrl: normalizedBaseUrl || undefined,
+    path: normalizedPath || undefined,
+  };
 };
 
 const normalizeModels = (models: ModelConfig[]): ModelConfig[] => {
-  return models.map(({ baseUrl, path, ...model }) => model);
+  return models.map((model) => normalizeModel(model));
 };
 
 const mergeModelsWithLocalApiKeys = (
@@ -63,12 +80,19 @@ const mergeModelsWithLocalApiKeys = (
   const mergedFromRemote = remoteNormalized.map((remoteModel) => {
     const localModel = localById.get(remoteModel.id);
     const localApiKey = localModel?.apiKey?.trim();
+    const remoteApiKey = remoteModel.apiKey?.trim();
+    const remoteBaseUrl = remoteModel.baseUrl?.trim();
+    const localBaseUrl = localModel?.baseUrl?.trim();
+    const remotePath = remoteModel.path?.trim();
+    const localPath = localModel?.path?.trim();
 
-    return {
+    return normalizeModel({
       ...localModel,
       ...remoteModel,
-      ...(localApiKey && !remoteModel.apiKey ? { apiKey: localApiKey } : {}),
-    };
+      apiKey: localApiKey || remoteApiKey || undefined,
+      baseUrl: remoteBaseUrl || localBaseUrl || undefined,
+      path: remotePath || localPath || undefined,
+    });
   });
 
   const remoteIds = new Set(remoteNormalized.map((model) => model.id));
@@ -156,18 +180,26 @@ const SettingsView: React.FC<SettingsProps> = ({ settings, onSettingsUpdate }) =
     setSyncStatus('idle');
   };
 
-  const handleSave = async () => {
-    const normalizedFormData: AppSettings = {
-      ...formData,
-      models: normalizeModels(formData.models),
+  const persistSettingsChanges = async (
+    nextSettings: AppSettings,
+    options: { showSaveFeedback?: boolean } = {},
+  ) => {
+    const normalizedSettings: AppSettings = {
+      ...nextSettings,
+      models: normalizeModels(nextSettings.models),
     };
 
-    await saveSettings(normalizedFormData);
-    onSettingsUpdate(normalizedFormData);
-    setFormData(normalizedFormData);
-    setIsSaved(true);
+    await saveSettings(normalizedSettings);
+    onSettingsUpdate(normalizedSettings);
+    setFormData(normalizedSettings);
 
-    const apiService = new ApiService(normalizedFormData);
+    if (options.showSaveFeedback) {
+      setIsSaved(true);
+    } else {
+      setIsSaved(false);
+    }
+
+    const apiService = new ApiService(normalizedSettings);
     const modelConfigSuccess = await apiService.setModelConfig();
 
     if (!modelConfigSuccess) {
@@ -179,7 +211,7 @@ const SettingsView: React.FC<SettingsProps> = ({ settings, onSettingsUpdate }) =
 
     if (currentLoggedIn) {
       setSyncStatus('syncing');
-      const success = await apiService.saveConfig(normalizedFormData);
+      const success = await apiService.saveConfig(normalizedSettings);
 
       if (success) {
         setSyncStatus('synced');
@@ -188,12 +220,25 @@ const SettingsView: React.FC<SettingsProps> = ({ settings, onSettingsUpdate }) =
         setSyncStatus('error');
         console.error('Failed to sync config to backend');
       }
+
+      setTimeout(() => {
+        setSyncStatus('idle');
+      }, 3000);
+    } else {
+      setSyncStatus('idle');
     }
 
-    setTimeout(() => {
-      setIsSaved(false);
-      setSyncStatus('idle');
-    }, 3000);
+    if (options.showSaveFeedback) {
+      setTimeout(() => {
+        setIsSaved(false);
+      }, 3000);
+    }
+
+    return normalizedSettings;
+  };
+
+  const handleSave = async () => {
+    await persistSettingsChanges(formData, { showSaveFeedback: true });
   };
 
   const handleTestConnection = async (modelId: string) => {
@@ -219,65 +264,75 @@ const SettingsView: React.FC<SettingsProps> = ({ settings, onSettingsUpdate }) =
       name: model.name,
       displayName: model.displayName,
       apiKey: model.apiKey || '',
+      baseUrl: model.baseUrl || '',
+      path: model.path || '',
     });
     setEditingModelId(model.id);
     setIsFormOpen(true);
   };
 
-  const handleSaveModelConfig = () => {
+  const handleSaveModelConfig = async () => {
     if (!modelForm.displayName || !modelForm.name) return;
 
     const normalizedApiKey = modelForm.apiKey?.trim() || undefined;
+    const normalizedBaseUrl = modelForm.baseUrl?.trim() || undefined;
+    const normalizedPath = modelForm.path?.trim() || undefined;
+
+    let nextSettings: AppSettings;
 
     if (editingModelId) {
-      setFormData((prev) => ({
-        ...prev,
-        models: prev.models.map((m) =>
-          m.id === editingModelId
+      nextSettings = {
+        ...formData,
+        models: formData.models.map((model) =>
+          model.id === editingModelId
             ? {
-                ...m,
+                ...model,
                 displayName: modelForm.displayName!,
                 name: modelForm.name!,
                 apiKey: normalizedApiKey,
-                baseUrl: undefined,
-                path: undefined,
+                baseUrl: normalizedBaseUrl,
+                path: normalizedPath,
               }
-            : m,
+            : model,
         ),
-      }));
+      };
     } else {
       const modelConfig: ModelConfig = {
         id: `custom-${Date.now()}`,
         displayName: modelForm.displayName!,
         name: modelForm.name!,
         apiKey: normalizedApiKey,
+        baseUrl: normalizedBaseUrl,
+        path: normalizedPath,
       };
-      setFormData((prev) => ({
-        ...prev,
-        models: [...prev.models, modelConfig],
-      }));
+
+      nextSettings = {
+        ...formData,
+        models: [...formData.models, modelConfig],
+      };
     }
 
     resetForm();
-    setIsSaved(false);
+    await persistSettingsChanges(nextSettings);
   };
 
-  const handleDeleteModel = (id: string) => {
-    if (confirm('确定要删除此配置吗？')) {
-      setFormData((prev) => ({
-        ...prev,
-        models: prev.models.filter((m) => m.id !== id),
-        activeTextModelId:
-          prev.activeTextModelId === id
-            ? DEFAULT_SETTINGS.activeTextModelId
-            : prev.activeTextModelId,
-        activeImageModelId:
-          prev.activeImageModelId === id
-            ? DEFAULT_SETTINGS.activeImageModelId
-            : prev.activeImageModelId,
-      }));
-      setIsSaved(false);
-    }
+  const handleDeleteModel = async (id: string) => {
+    if (!confirm('确定要删除此配置吗？')) return;
+
+    const nextSettings: AppSettings = {
+      ...formData,
+      models: formData.models.filter((model) => model.id !== id),
+      activeTextModelId:
+        formData.activeTextModelId === id
+          ? DEFAULT_SETTINGS.activeTextModelId
+          : formData.activeTextModelId,
+      activeImageModelId:
+        formData.activeImageModelId === id
+          ? DEFAULT_SETTINGS.activeImageModelId
+          : formData.activeImageModelId,
+    };
+
+    await persistSettingsChanges(nextSettings);
   };
 
   const cardClass =
@@ -491,6 +546,10 @@ const SettingsView: React.FC<SettingsProps> = ({ settings, onSettingsUpdate }) =
             )}
           </div>
 
+          <p className="text-xs text-gray-400 mb-4">
+            模型新增、编辑、删除会自动保存；无需再点击“保存更改”。
+          </p>
+
           {isFormOpen && (
             <div className="mb-8 p-6 bg-gray-50 rounded-2xl border border-xhs-border animate-fade-in relative">
               <div className="flex justify-between items-center mb-4">
@@ -539,6 +598,33 @@ const SettingsView: React.FC<SettingsProps> = ({ settings, onSettingsUpdate }) =
                     value={modelForm.apiKey}
                     onChange={(e) =>
                       setModelForm({ ...modelForm, apiKey: e.target.value })
+                    }
+                  />
+                </div>
+                <div className="md:col-span-2 space-y-1">
+                  <label className="text-xs text-xhs-secondary ml-1">Base URL（可选）</label>
+                  <input
+                    type="text"
+                    placeholder="例如: https://api.openai.com"
+                    className={`w-full p-3 rounded-xl border border-xhs-border bg-white ${focusRing} focus-visible:ring-offset-gray-50`}
+                    value={modelForm.baseUrl || ''}
+                    onChange={(e) =>
+                      setModelForm({ ...modelForm, baseUrl: e.target.value })
+                    }
+                  />
+                  <p className="text-[11px] text-gray-400 ml-1">
+                    可自由填写；仅支持 https，且不能是内网地址。
+                  </p>
+                </div>
+                <div className="md:col-span-2 space-y-1">
+                  <label className="text-xs text-xhs-secondary ml-1">Path（可选）</label>
+                  <input
+                    type="text"
+                    placeholder="例如: /v1/chat/completions"
+                    className={`w-full p-3 rounded-xl border border-xhs-border bg-white ${focusRing} focus-visible:ring-offset-gray-50`}
+                    value={modelForm.path || ''}
+                    onChange={(e) =>
+                      setModelForm({ ...modelForm, path: e.target.value })
                     }
                   />
                 </div>
@@ -593,6 +679,11 @@ const SettingsView: React.FC<SettingsProps> = ({ settings, onSettingsUpdate }) =
                         {model.apiKey && (
                           <span className="text-green-600 flex items-center">
                             <Key size={10} className="mr-1" aria-hidden="true" /> 已配置 Key
+                          </span>
+                        )}
+                        {(model.baseUrl || model.path) && (
+                          <span className="text-blue-600 bg-blue-50 px-2 py-0.5 rounded font-mono max-w-[260px] truncate">
+                            {`${model.baseUrl || ''}${model.path || ''}`}
                           </span>
                         )}
                       </div>
