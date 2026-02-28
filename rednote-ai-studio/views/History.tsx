@@ -75,7 +75,13 @@ const History: React.FC<HistoryProps> = ({ onRestorePost }) => {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {posts.map((post) => {
             const title = post.selectedOutline?.title || post.outlines[0]?.title || post.topic;
-            const preview = post.fullCaption || post.outlines[0]?.content || '点击继续编辑';
+            const latestCompleted = post.completedContents?.[post.completedContents.length - 1];
+            const previewImageUrl = latestCompleted?.imageUrl || post.imageUrl;
+            const preview =
+              latestCompleted?.caption
+              || post.fullCaption
+              || post.outlines[0]?.content
+              || '点击查看详情';
 
             const handleKeyDown = (e: React.KeyboardEvent) => {
               if (e.key === 'Enter' || e.key === ' ') {
@@ -95,10 +101,12 @@ const History: React.FC<HistoryProps> = ({ onRestorePost }) => {
                 aria-label={`打开历史记录：${title}`}
               >
                 <div className="h-48 overflow-hidden bg-gray-100 relative">
-                  {post.imageUrl ? (
+                  {previewImageUrl ? (
                     <img
-                      src={post.imageUrl}
+                      src={previewImageUrl}
                       alt={post.topic}
+                      loading="lazy"
+                      decoding="async"
                       className="w-full h-full object-cover group-hover:scale-105 transition-transform"
                     />
                   ) : (

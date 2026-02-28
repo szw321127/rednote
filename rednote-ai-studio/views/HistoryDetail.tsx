@@ -100,7 +100,10 @@ const HistoryDetail: React.FC<HistoryDetailProps> = ({ onRestorePost }) => {
       </Badge>
     );
 
-  const previewText = post.fullCaption || post.outlines[0]?.content || '';
+  const latestCompleted = post.completedContents?.[post.completedContents.length - 1];
+  const previewImageUrl = latestCompleted?.imageUrl || post.imageUrl;
+  const previewText =
+    latestCompleted?.caption || post.fullCaption || post.outlines[0]?.content || '';
 
   return (
     <div className="max-w-4xl mx-auto pb-20">
@@ -125,10 +128,12 @@ const HistoryDetail: React.FC<HistoryDetailProps> = ({ onRestorePost }) => {
           <div className="flex flex-col md:flex-row md:items-start gap-6">
             <div className="w-full md:w-64 shrink-0">
               <div className="w-full aspect-square bg-gray-100 rounded-2xl overflow-hidden border border-xhs-border">
-                {post.imageUrl ? (
+                {previewImageUrl ? (
                   <img
-                    src={post.imageUrl}
+                    src={previewImageUrl}
                     alt={post.topic}
+                    loading="lazy"
+                    decoding="async"
                     className="w-full h-full object-cover"
                   />
                 ) : (
