@@ -1,5 +1,5 @@
 import { X } from "lucide-react";
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { Outline } from "../types";
 
 interface OutlineEditModalProps {
@@ -21,6 +21,8 @@ export const OutlineEditModal: React.FC<OutlineEditModalProps> = ({
   const [tags, setTags] = useState<string[]>([]);
   const [tagInput, setTagInput] = useState("");
 
+  const titleInputRef = useRef<HTMLInputElement | null>(null);
+
   useEffect(() => {
     if (outline) {
       setTitle(outline.title);
@@ -29,6 +31,33 @@ export const OutlineEditModal: React.FC<OutlineEditModalProps> = ({
       setTags(outline.tags);
     }
   }, [outline]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const timeoutId = window.setTimeout(() => {
+      titleInputRef.current?.focus();
+    }, 0);
+
+    return () => {
+      window.clearTimeout(timeoutId);
+    };
+  }, [isOpen]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        onClose();
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [isOpen, onClose]);
 
   if (!isOpen || !outline) return null;
 
@@ -75,8 +104,18 @@ export const OutlineEditModal: React.FC<OutlineEditModalProps> = ({
       role="dialog"
       aria-modal="true"
       aria-label="编辑大纲"
+      onMouseDown={(event) => {
+        if (event.target === event.currentTarget) {
+          onClose();
+        }
+      }}
     >
-      <div className="bg-xhs-surface rounded-2xl shadow-soft-md max-w-2xl w-full max-h-[90vh] overflow-y-auto border border-xhs-border">
+      <div
+        className="bg-xhs-surface rounded-2xl shadow-soft-md max-w-2xl w-full max-h-[90vh] overflow-y-auto border border-xhs-border"
+        onMouseDown={(event) => {
+          event.stopPropagation();
+        }}
+      >
         <div className="flex items-center justify-between p-6 border-b border-xhs-border">
           <h2 className="text-2xl font-bold text-xhs-text">编辑大纲</h2>
           <button
@@ -109,6 +148,7 @@ export const OutlineEditModal: React.FC<OutlineEditModalProps> = ({
               标题
             </label>
             <input
+              ref={titleInputRef}
               type="text"
               value={title}
               onChange={(e) => setTitle(e.target.value)}

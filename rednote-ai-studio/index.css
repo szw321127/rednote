@@ -55,3 +55,28 @@ body {
 .animate-fade-in {
   animation: fadeIn 240ms ease-out both;
 }
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+  }
+
+  .animate-fade-in {
+    animation: none !important;
+  }
+
+  .animate-spin {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+  }
+
+  .transition-all,
+  .transition,
+  .transition-colors,
+  .transition-opacity,
+  .transition-transform {
+    transition-duration: 0.001ms !important;
+  }
+}

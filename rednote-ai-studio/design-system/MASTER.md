@@ -146,9 +146,10 @@ Soft UI 的关键：阴影“轻、短、分层”。
 
 ### 2.7 Modal
 
-- Overlay：`bg-black/50`
+- Overlay：`bg-black/50`（点击遮罩可关闭）
 - Panel：`bg-surface + border + shadow-soft-md`
 - Close（icon-only）：必须 `aria-label` + `focus-visible`
+- 键盘：支持 `Esc` 关闭
 
 ### 2.8 Loading
 
