@@ -1,8 +1,12 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { saveHistory } from "../services/db";
 import { ApiService } from "../services/geminiService";
 import { AppSettings, CompletedContent, GeneratedPost, Outline } from "../types";
 import { generateUUID, isSimilarToExisting } from "../utils";
+
+const isAbortError = (error: unknown): boolean => {
+  return error instanceof Error && error.name === "AbortError";
+};
 
 export const useGenerator = (
   settings: AppSettings,
@@ -16,6 +20,7 @@ export const useGenerator = (
   const [completedContents, setCompletedContents] = useState<CompletedContent[]>([]);
   const [progressText, setProgressText] = useState("");
   const [currentHistoryId, setCurrentHistoryId] = useState<string | null>(null);
+  const abortControllerRef = useRef<AbortController | null>(null);
 
   const service = new ApiService(settings);
 
@@ -51,18 +56,41 @@ export const useGenerator = (
     }
   }, [initialPost]);
 
+  useEffect(() => {
+    return () => {
+      abortControllerRef.current?.abort();
+    };
+  }, []);
+
+  const cancelGeneration = useCallback(() => {
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+      abortControllerRef.current = null;
+    }
+    setIsGenerating(false);
+    setProgressText("已取消");
+  }, []);
+
   // 生成大纲
   const handleGenerateOutlines = async () => {
     if (!topic.trim()) return;
+
+    const abortController = new AbortController();
+    abortControllerRef.current = abortController;
+
     setIsGenerating(true);
     setStep(1);
     setProgressText("正在请求后端生成大纲...");
     setOutlines([]);
 
     try {
-      const results = await service.generateOutlinesStream(topic, (chunk) => {
-        if (chunk.length < 50) setProgressText("正在接收流式数据...");
-      });
+      const results = await service.generateOutlinesStream(
+        topic,
+        (chunk) => {
+          if (chunk.length < 50) setProgressText("正在接收流式数据...");
+        },
+        abortController.signal,
+      );
       setOutlines(results);
 
       const historyId = currentHistoryId || generateUUID();
@@ -79,9 +107,17 @@ export const useGenerator = (
 
       await saveHistory(historyPost);
     } catch (e) {
+      if (isAbortError(e)) {
+        setStep(0);
+        return;
+      }
+
       alert("生成大纲失败，请检查后端连接或重试。");
       setStep(0);
     } finally {
+      if (abortControllerRef.current === abortController) {
+        abortControllerRef.current = null;
+      }
       setIsGenerating(false);
     }
   };
@@ -95,13 +131,20 @@ export const useGenerator = (
       return;
     }
 
+    const abortController = new AbortController();
+    abortControllerRef.current = abortController;
+
     setIsGenerating(true);
     setProgressText("正在生成新的大纲...");
 
     try {
-      const results = await service.generateOutlinesStream(topic, (chunk) => {
-        if (chunk.length < 50) setProgressText("正在接收流式数据...");
-      });
+      const results = await service.generateOutlinesStream(
+        topic,
+        (chunk) => {
+          if (chunk.length < 50) setProgressText("正在接收流式数据...");
+        },
+        abortController.signal,
+      );
 
       const filteredResults = results.filter((newOutline) => {
         return !isSimilarToExisting(newOutline, outlines, 0.6);
@@ -134,20 +177,33 @@ export const useGenerator = (
       await saveHistory(historyPost);
       alert(`成功添加了 ${newOutlines.length} 个新大纲！`);
     } catch (e) {
+      if (isAbortError(e)) {
+        return;
+      }
+
       alert("生成新大纲失败，请检查后端连接或重试。");
     } finally {
+      if (abortControllerRef.current === abortController) {
+        abortControllerRef.current = null;
+      }
       setIsGenerating(false);
     }
   };
 
   // 选择大纲生成成品
   const handleSelectOutline = async (outline: Outline) => {
+    const abortController = new AbortController();
+    abortControllerRef.current = abortController;
+
     setIsGenerating(true);
     setStep(2);
     setProgressText("正在后端生成图片与文案...");
 
     try {
-      const { imageUrl, caption } = await service.generateImageAndCaption(outline);
+      const { imageUrl, caption } = await service.generateImageAndCaption(
+        outline,
+        abortController.signal,
+      );
 
       // 创建新的成品内容
       const newContent: CompletedContent = {
@@ -179,10 +235,18 @@ export const useGenerator = (
       setCurrentHistoryId(historyId);
       await saveHistory(newPost);
     } catch (e) {
+      if (isAbortError(e)) {
+        setStep(1);
+        return;
+      }
+
       console.error(e);
       alert("生成最终图文失败，请检查后端服务。");
       setStep(1);
     } finally {
+      if (abortControllerRef.current === abortController) {
+        abortControllerRef.current = null;
+      }
       setIsGenerating(false);
     }
   };
@@ -219,11 +283,13 @@ export const useGenerator = (
 
   // 重置所有状态
   const reset = () => {
+    cancelGeneration();
     setStep(0);
     setTopic("");
     setOutlines([]);
     setCompletedContents([]);
     setCurrentHistoryId(null);
+    setProgressText("");
   };
 
   // 复制文案
@@ -271,6 +337,7 @@ export const useGenerator = (
     outlines,
     completedContents,
     progressText,
+    currentHistoryId,
 
     // 操作
     setStep,
@@ -279,6 +346,7 @@ export const useGenerator = (
     handleRegenerateOutlines,
     handleSelectOutline,
     handleEditOutline,
+    cancelGeneration,
     reset,
     handleCopyCaption,
     handleDownloadImage,

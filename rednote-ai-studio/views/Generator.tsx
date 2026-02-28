@@ -11,12 +11,21 @@ interface GeneratorProps {
   settings: AppSettings;
   initialPost?: GeneratedPost | null;
   onPostRestored?: () => void;
+  onGenerationStateChange?: (state: {
+    isGenerating: boolean;
+    progressText: string;
+    step: number;
+    currentHistoryId: string | null;
+  }) => void;
+  onCancelRef?: (cancel: (() => void) | null) => void;
 }
 
 const Generator: React.FC<GeneratorProps> = ({
   settings,
   initialPost,
   onPostRestored,
+  onGenerationStateChange,
+  onCancelRef,
 }) => {
   const {
     // 状态
@@ -26,6 +35,7 @@ const Generator: React.FC<GeneratorProps> = ({
     outlines,
     completedContents,
     progressText,
+    currentHistoryId,
 
     // 操作
     setStep,
@@ -34,10 +44,28 @@ const Generator: React.FC<GeneratorProps> = ({
     handleRegenerateOutlines,
     handleSelectOutline,
     handleEditOutline,
+    cancelGeneration,
     reset,
     handleCopyCaption,
     handleDownloadImage,
   } = useGenerator(settings, initialPost, onPostRestored);
+
+  React.useEffect(() => {
+    onCancelRef?.(cancelGeneration);
+
+    return () => {
+      onCancelRef?.(null);
+    };
+  }, [cancelGeneration, onCancelRef]);
+
+  React.useEffect(() => {
+    onGenerationStateChange?.({
+      isGenerating,
+      progressText,
+      step,
+      currentHistoryId,
+    });
+  }, [currentHistoryId, isGenerating, onGenerationStateChange, progressText, step]);
 
   const handleStepClick = (targetStep: number) => {
     if (isGenerating) return;

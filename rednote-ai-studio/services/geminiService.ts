@@ -95,7 +95,11 @@ export class ApiService {
    * Calls the backend to generate outlines.
    * Expects the backend to stream text (SSE or raw stream).
    */
-  async generateOutlinesStream(topic: string, onChunk: (text: string) => void): Promise<Outline[]> {
+  async generateOutlinesStream(
+    topic: string,
+    onChunk: (text: string) => void,
+    signal?: AbortSignal,
+  ): Promise<Outline[]> {
     // No longer need to send modelConfig, it's in session
     const payload = {
       topic,
@@ -107,6 +111,7 @@ export class ApiService {
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include', // Important: include credentials for session
         body: JSON.stringify(payload),
+        signal,
       });
 
       if (!response.ok) {
@@ -155,7 +160,10 @@ export class ApiService {
   /**
    * Calls the backend to generate image and caption.
    */
-  async generateImageAndCaption(outline: Outline): Promise<{ imageUrl: string; caption: string }> {
+  async generateImageAndCaption(
+    outline: Outline,
+    signal?: AbortSignal,
+  ): Promise<{ imageUrl: string; caption: string }> {
     // No longer need to send modelConfig, it's in session
     const payload = {
       outline,
@@ -166,6 +174,7 @@ export class ApiService {
       headers: { 'Content-Type': 'application/json' },
       credentials: 'include', // Important: include credentials for session
       body: JSON.stringify(payload),
+      signal,
     });
 
     const result = await parseJsonResponse<{ imageUrl: string; caption: string }>(response);

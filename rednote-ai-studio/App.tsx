@@ -20,6 +20,7 @@ import { AppSettings, DEFAULT_SETTINGS, GeneratedPost } from './types';
 import { getHistoryById, getSettings } from './services/db';
 import { ApiService } from './services/geminiService';
 import { getUser, setTokens, setUser, clearAuth, AuthUser } from './services/auth';
+import { Button } from './components/ui/Button';
 
 type LoginLocationState = {
   from?: string;
@@ -34,6 +35,20 @@ const Shell: React.FC<{
 }> = ({ user, onLogout, settings, cachedPost, onPostRestored }) => {
   const location = useLocation();
   const navigate = useNavigate();
+
+  const [generationState, setGenerationState] = useState<{
+    isGenerating: boolean;
+    progressText: string;
+    step: number;
+    currentHistoryId: string | null;
+  }>({
+    isGenerating: false,
+    progressText: '',
+    step: 0,
+    currentHistoryId: null,
+  });
+
+  const cancelGenerationRef = useRef<(() => void) | null>(null);
   const matchedGeneratorPost = matchPath('/generator/:postId', location.pathname);
   const postId = matchedGeneratorPost?.params.postId;
   const isGeneratorRoute = location.pathname === '/generator' || Boolean(postId);
@@ -97,15 +112,55 @@ const Shell: React.FC<{
     };
   }, [postId, cachedPost, navigate]);
 
+  const shouldShowBanner =
+    !isGeneratorRoute
+    && generationState.isGenerating
+    && generationState.progressText.trim().length > 0;
+
+  const handleBackToGenerator = () => {
+    const id = generationState.currentHistoryId;
+    if (id) {
+      navigate(`/generator/${id}`);
+    } else {
+      navigate('/generator');
+    }
+  };
+
   return (
     <div className="flex min-h-screen bg-xhs-bg text-xhs-text">
       <Sidebar user={user} onLogout={onLogout} />
       <main className="flex-1 p-6 md:p-10 overflow-y-auto h-screen no-scrollbar">
+        {shouldShowBanner && (
+          <div className="mb-6 bg-xhs-surface border border-xhs-border rounded-2xl shadow-soft p-4 flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+            <div className="min-w-0">
+              <div className="text-sm font-semibold text-xhs-text">正在生成…</div>
+              <div className="text-xs text-xhs-secondary truncate">
+                {generationState.progressText}
+              </div>
+            </div>
+            <div className="flex gap-3 shrink-0">
+              <Button variant="secondary" onClick={handleBackToGenerator}>
+                回到生成器
+              </Button>
+              <Button
+                variant="danger"
+                onClick={() => cancelGenerationRef.current?.()}
+              >
+                取消生成
+              </Button>
+            </div>
+          </div>
+        )}
+
         <div hidden={!isGeneratorRoute || isRestoringPost}>
           <Generator
             settings={settings}
             initialPost={initialPost}
             onPostRestored={onPostRestored}
+            onGenerationStateChange={setGenerationState}
+            onCancelRef={(cancel) => {
+              cancelGenerationRef.current = cancel;
+            }}
           />
         </div>
 
