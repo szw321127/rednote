@@ -1,10 +1,10 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import Sidebar from './components/Sidebar';
 import Generator from './views/Generator';
 import History from './views/History';
 import SettingsView from './views/Settings';
 import AuthView from './views/AuthView';
-import { AppSettings, DEFAULT_SETTINGS, ViewState, GeneratedPost } from './types';
+import { AppSettings, DEFAULT_SETTINGS, GeneratedPost } from './types';
 import { getSettings } from './services/db';
 import { ApiService } from './services/geminiService';
 import {
@@ -14,15 +14,23 @@ import {
   clearAuth,
   AuthUser,
 } from './services/auth';
+import { AppRoute, navigate, useRoute } from './utils/router';
 
 const App: React.FC = () => {
-  const [currentView, setCurrentView] = useState<ViewState>('generator');
+  const [route] = useRoute();
+  const lastNonLoginRouteRef = useRef<AppRoute>('/generator');
+
   const [settings, setSettings] = useState<AppSettings>(DEFAULT_SETTINGS);
   const [isHydrated, setIsHydrated] = useState(false);
   const [restoredPost, setRestoredPost] = useState<GeneratedPost | null>(null);
   const [user, setCurrentUser] = useState<AuthUser | null>(getUser());
-  const [showAuth, setShowAuth] = useState(false);
   const isInitialized = useRef(false);
+
+  useEffect(() => {
+    if (route !== '/login') {
+      lastNonLoginRouteRef.current = route;
+    }
+  }, [route]);
 
   useEffect(() => {
     if (isInitialized.current) return;
@@ -50,7 +58,7 @@ const App: React.FC = () => {
     setTokens(data.accessToken, data.refreshToken);
     setUser(data.user);
     setCurrentUser(data.user);
-    setShowAuth(false);
+    navigate(lastNonLoginRouteRef.current, { replace: true });
   };
 
   const handleLogout = () => {
@@ -60,7 +68,7 @@ const App: React.FC = () => {
 
   const handleRestorePost = (post: GeneratedPost) => {
     setRestoredPost(post);
-    setCurrentView('generator');
+    navigate('/generator');
   };
 
   const handlePostRestored = () => {
@@ -69,19 +77,19 @@ const App: React.FC = () => {
 
   if (!isHydrated) return null;
 
-  if (showAuth) {
+  if (route === '/login') {
     return (
       <AuthView
         backendUrl={settings.backendUrl}
         onLoginSuccess={handleLoginSuccess}
-        onSkip={() => setShowAuth(false)}
+        onSkip={() => navigate(lastNonLoginRouteRef.current, { replace: true })}
       />
     );
   }
 
   const renderView = () => {
-    switch (currentView) {
-      case 'generator':
+    switch (route) {
+      case '/generator':
         return (
           <Generator
             settings={settings}
@@ -89,9 +97,9 @@ const App: React.FC = () => {
             onPostRestored={handlePostRestored}
           />
         );
-      case 'history':
+      case '/history':
         return <History onRestorePost={handleRestorePost} />;
-      case 'settings':
+      case '/settings':
         return <SettingsView settings={settings} onSettingsUpdate={setSettings} />;
       default:
         return (
@@ -106,13 +114,7 @@ const App: React.FC = () => {
 
   return (
     <div className="flex min-h-screen bg-xhs-bg text-xhs-text">
-      <Sidebar
-        currentView={currentView}
-        onViewChange={setCurrentView}
-        user={user}
-        onLoginClick={() => setShowAuth(true)}
-        onLogout={handleLogout}
-      />
+      <Sidebar currentRoute={route} user={user} onLogout={handleLogout} />
       <main className="flex-1 p-6 md:p-10 overflow-y-auto h-screen no-scrollbar">
         {renderView()}
       </main>

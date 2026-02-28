@@ -1,27 +1,23 @@
 import React from 'react';
 import { PenTool, History, Settings, Sparkles, LogIn, LogOut } from 'lucide-react';
-import { ViewState } from '../types';
 import { AuthUser } from '../services/auth';
+import { AppRoute, navigate } from '../utils/router';
 
 interface SidebarProps {
-  currentView: ViewState;
-  onViewChange: (view: ViewState) => void;
+  currentRoute: AppRoute;
   user?: AuthUser | null;
-  onLoginClick?: () => void;
   onLogout?: () => void;
 }
 
-const Sidebar: React.FC<SidebarProps> = ({
-  currentView,
-  onViewChange,
-  user,
-  onLoginClick,
-  onLogout,
-}) => {
-  const menuItems = [
-    { id: 'generator', label: '作品生成', icon: Sparkles },
-    { id: 'history', label: '历史记录', icon: History },
-    { id: 'settings', label: '用户设置', icon: Settings },
+const Sidebar: React.FC<SidebarProps> = ({ currentRoute, user, onLogout }) => {
+  const menuItems: Array<{
+    route: Exclude<AppRoute, '/login'>;
+    label: string;
+    icon: typeof Sparkles;
+  }> = [
+    { route: '/generator', label: '作品生成', icon: Sparkles },
+    { route: '/history', label: '历史记录', icon: History },
+    { route: '/settings', label: '用户设置', icon: Settings },
   ];
 
   return (
@@ -37,13 +33,13 @@ const Sidebar: React.FC<SidebarProps> = ({
 
       <nav className="flex-1 py-4 px-2 md:px-3 space-y-1">
         {menuItems.map((item) => {
-          const isActive = currentView === item.id;
+          const isActive = currentRoute === item.route;
 
           return (
             <button
-              key={item.id}
+              key={item.route}
               type="button"
-              onClick={() => onViewChange(item.id as ViewState)}
+              onClick={() => navigate(item.route)}
               className={`group relative w-full flex items-center px-3 md:px-4 py-3 rounded-xl transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-xhs-red/30 focus-visible:ring-offset-2 focus-visible:ring-offset-xhs-surface ${
                 isActive
                   ? 'text-xhs-red bg-red-50'
@@ -106,7 +102,7 @@ const Sidebar: React.FC<SidebarProps> = ({
         ) : (
           <button
             type="button"
-            onClick={onLoginClick}
+            onClick={() => navigate('/login')}
             className="w-full flex items-center justify-center md:justify-start px-4 md:px-4 py-2.5 text-sm text-xhs-secondary hover:text-xhs-red hover:bg-red-50 rounded-xl transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-xhs-red/30 focus-visible:ring-offset-2 focus-visible:ring-offset-xhs-surface"
           >
             <LogIn size={18} aria-hidden="true" />
