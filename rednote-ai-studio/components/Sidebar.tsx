@@ -1,24 +1,23 @@
 import React from 'react';
 import { PenTool, History, Settings, Sparkles, LogIn, LogOut } from 'lucide-react';
+import { NavLink, useLocation, useNavigate } from 'react-router-dom';
+
 import { AuthUser } from '../services/auth';
-import { AppRoute, navigate } from '../utils/router';
 
 interface SidebarProps {
-  currentRoute: AppRoute;
   user?: AuthUser | null;
   onLogout?: () => void;
 }
 
-const Sidebar: React.FC<SidebarProps> = ({ currentRoute, user, onLogout }) => {
-  const menuItems: Array<{
-    route: Exclude<AppRoute, '/login'>;
-    label: string;
-    icon: typeof Sparkles;
-  }> = [
-    { route: '/generator', label: '作品生成', icon: Sparkles },
-    { route: '/history', label: '历史记录', icon: History },
-    { route: '/settings', label: '用户设置', icon: Settings },
-  ];
+const Sidebar: React.FC<SidebarProps> = ({ user, onLogout }) => {
+  const navigate = useNavigate();
+  const location = useLocation();
+
+  const menuItems = [
+    { to: '/generator', label: '作品生成', icon: Sparkles },
+    { to: '/history', label: '历史记录', icon: History },
+    { to: '/settings', label: '用户设置', icon: Settings },
+  ] as const;
 
   return (
     <div className="w-20 md:w-64 bg-xhs-surface h-screen flex flex-col border-r border-xhs-border sticky top-0">
@@ -32,39 +31,44 @@ const Sidebar: React.FC<SidebarProps> = ({ currentRoute, user, onLogout }) => {
       </div>
 
       <nav className="flex-1 py-4 px-2 md:px-3 space-y-1">
-        {menuItems.map((item) => {
-          const isActive = currentRoute === item.route;
-
-          return (
-            <button
-              key={item.route}
-              type="button"
-              onClick={() => navigate(item.route)}
-              className={`group relative w-full flex items-center px-3 md:px-4 py-3 rounded-xl transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-xhs-red/30 focus-visible:ring-offset-2 focus-visible:ring-offset-xhs-surface ${
+        {menuItems.map((item) => (
+          <NavLink
+            key={item.to}
+            to={item.to}
+            end
+            className={({ isActive }) =>
+              `group relative w-full flex items-center px-3 md:px-4 py-3 rounded-xl transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-xhs-red/30 focus-visible:ring-offset-2 focus-visible:ring-offset-xhs-surface ${
                 isActive
                   ? 'text-xhs-red bg-red-50'
                   : 'text-xhs-secondary hover:bg-gray-50 hover:text-xhs-text'
-              }`}
-              aria-current={isActive ? 'page' : undefined}
-            >
-              <span
-                className={`absolute left-0 top-2 bottom-2 w-1 rounded-r-full bg-xhs-red transition-opacity ${
-                  isActive ? 'opacity-100' : 'opacity-0 group-hover:opacity-40'
-                }`}
-                aria-hidden="true"
-              />
+              }`
+            }
+          >
+            {({ isActive }) => (
+              <>
+                <span
+                  className={`absolute left-0 top-2 bottom-2 w-1 rounded-r-full bg-xhs-red transition-opacity ${
+                    isActive ? 'opacity-100' : 'opacity-0 group-hover:opacity-40'
+                  }`}
+                  aria-hidden="true"
+                />
 
-              <item.icon size={22} strokeWidth={isActive ? 2.5 : 2} aria-hidden="true" />
-              <span
-                className={`ml-4 font-medium hidden md:block ${
-                  isActive ? 'text-xhs-text' : ''
-                }`}
-              >
-                {item.label}
-              </span>
-            </button>
-          );
-        })}
+                <item.icon
+                  size={22}
+                  strokeWidth={isActive ? 2.5 : 2}
+                  aria-hidden="true"
+                />
+                <span
+                  className={`ml-4 font-medium hidden md:block ${
+                    isActive ? 'text-xhs-text' : ''
+                  }`}
+                >
+                  {item.label}
+                </span>
+              </>
+            )}
+          </NavLink>
+        ))}
       </nav>
 
       <div className="p-4 border-t border-xhs-border space-y-3">
@@ -102,7 +106,9 @@ const Sidebar: React.FC<SidebarProps> = ({ currentRoute, user, onLogout }) => {
         ) : (
           <button
             type="button"
-            onClick={() => navigate('/login')}
+            onClick={() =>
+              navigate('/login', { state: { from: location.pathname } })
+            }
             className="w-full flex items-center justify-center md:justify-start px-4 md:px-4 py-2.5 text-sm text-xhs-secondary hover:text-xhs-red hover:bg-red-50 rounded-xl transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-xhs-red/30 focus-visible:ring-offset-2 focus-visible:ring-offset-xhs-surface"
           >
             <LogIn size={18} aria-hidden="true" />
