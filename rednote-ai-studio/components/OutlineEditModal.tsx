@@ -1,6 +1,8 @@
 import { X } from "lucide-react";
 import React, { useEffect, useRef, useState } from "react";
 import { Outline } from "../types";
+import { Button } from "./ui/Button";
+import { IconButton } from "./ui/IconButton";
 
 interface OutlineEditModalProps {
   outline: Outline | null;
@@ -118,14 +120,13 @@ export const OutlineEditModal: React.FC<OutlineEditModalProps> = ({
       >
         <div className="flex items-center justify-between p-6 border-b border-xhs-border">
           <h2 className="text-2xl font-bold text-xhs-text">编辑大纲</h2>
-          <button
-            type="button"
+          <IconButton
+            ariaLabel="关闭"
             onClick={onClose}
-            className={`p-2 hover:bg-gray-50 rounded-xl transition-colors ${focusRing} focus-visible:ring-offset-xhs-surface`}
-            aria-label="关闭"
+            className="focus-visible:ring-offset-xhs-surface"
           >
             <X size={20} className="text-xhs-secondary" aria-hidden="true" />
-          </button>
+          </IconButton>
         </div>
 
         <div className="p-6 space-y-6">
@@ -183,13 +184,14 @@ export const OutlineEditModal: React.FC<OutlineEditModalProps> = ({
                 placeholder="输入标签并按回车"
                 className={`${inputClass} flex-1 focus-visible:ring-offset-xhs-surface`}
               />
-              <button
-                type="button"
+              <Button
+                variant="primary"
+                size="lg"
                 onClick={handleAddTag}
-                className={`px-6 py-3 bg-xhs-red text-white rounded-xl hover:bg-red-600 transition-colors font-medium shadow-soft ${focusRing} focus-visible:ring-offset-xhs-surface`}
+                className="shadow-soft focus-visible:ring-offset-xhs-surface"
               >
                 添加
-              </button>
+              </Button>
             </div>
 
             <div className="flex flex-wrap gap-2">
@@ -214,20 +216,22 @@ export const OutlineEditModal: React.FC<OutlineEditModalProps> = ({
         </div>
 
         <div className="flex gap-3 p-6 border-t border-xhs-border">
-          <button
-            type="button"
+          <Button
+            variant="secondary"
+            size="lg"
             onClick={onClose}
-            className={`flex-1 py-3 bg-gray-100 text-xhs-text rounded-xl hover:bg-gray-200 transition-colors font-medium ${focusRing} focus-visible:ring-offset-xhs-surface`}
+            className="flex-1 focus-visible:ring-offset-xhs-surface"
           >
             取消
-          </button>
-          <button
-            type="button"
+          </Button>
+          <Button
+            variant="primary"
+            size="lg"
             onClick={handleSave}
-            className={`flex-1 py-3 bg-xhs-red text-white rounded-xl hover:bg-red-600 transition-colors font-medium shadow-soft ${focusRing} focus-visible:ring-offset-xhs-surface`}
+            className="flex-1 shadow-soft focus-visible:ring-offset-xhs-surface"
           >
             保存并生成
-          </button>
+          </Button>
         </div>
       </div>
     </div>

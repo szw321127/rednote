@@ -19,6 +19,11 @@ import {
 } from 'lucide-react';
 import { ApiService } from '../services/geminiService';
 import { isLoggedIn } from '../services/auth';
+import { Badge } from '../components/ui/Badge';
+import { Button } from '../components/ui/Button';
+import { Card } from '../components/ui/Card';
+import { IconButton } from '../components/ui/IconButton';
+import { Input } from '../components/ui/Input';
 
 interface SettingsProps {
   settings: AppSettings;
@@ -335,9 +340,6 @@ const SettingsView: React.FC<SettingsProps> = ({ settings, onSettingsUpdate }) =
     await persistSettingsChanges(nextSettings);
   };
 
-  const cardClass =
-    'bg-xhs-surface rounded-2xl shadow-soft border border-xhs-border p-6 md:p-8';
-
   const focusRing =
     'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-xhs-red/30 focus-visible:ring-offset-2';
 
@@ -370,10 +372,11 @@ const SettingsView: React.FC<SettingsProps> = ({ settings, onSettingsUpdate }) =
         </div>
 
         <div className="flex flex-col items-end gap-2">
-          <button
-            type="button"
+          <Button
+            variant="primary"
+            size="lg"
             onClick={handleSave}
-            className={`bg-xhs-red text-white px-6 py-3 rounded-xl text-sm font-bold hover:bg-red-600 flex items-center shadow-soft transition-colors ${focusRing} focus-visible:ring-offset-xhs-bg`}
+            className="font-bold focus-visible:ring-offset-xhs-bg"
           >
             {isSaved ? (
               <Check size={18} className="mr-2" aria-hidden="true" />
@@ -381,7 +384,7 @@ const SettingsView: React.FC<SettingsProps> = ({ settings, onSettingsUpdate }) =
               <Save size={18} className="mr-2" aria-hidden="true" />
             )}
             {isSaved ? '已保存' : '保存更改'}
-          </button>
+          </Button>
 
           {syncStatus !== 'idle' && (
             <div
@@ -419,7 +422,7 @@ const SettingsView: React.FC<SettingsProps> = ({ settings, onSettingsUpdate }) =
       </div>
 
       <div className="grid gap-8">
-        <div className={cardClass}>
+        <Card>
           <h3 className="text-lg font-bold text-xhs-text mb-6 flex items-center">
             <Server className="mr-2 text-xhs-red" size={20} aria-hidden="true" />
             后端服务配置
@@ -446,9 +449,9 @@ const SettingsView: React.FC<SettingsProps> = ({ settings, onSettingsUpdate }) =
               所有的 AI 生成请求将发送至此地址 (例如: /api/generate/outline)
             </p>
           </div>
-        </div>
+        </Card>
 
-        <div className={cardClass}>
+        <Card>
           <h3 className="text-lg font-bold text-xhs-text mb-6 flex items-center">
             <Database className="mr-2 text-xhs-red" size={20} aria-hidden="true" />
             当前使用模型
@@ -527,22 +530,23 @@ const SettingsView: React.FC<SettingsProps> = ({ settings, onSettingsUpdate }) =
               <p className="text-xs text-gray-400 mt-1">核采样概率阈值</p>
             </div>
           </div>
-        </div>
+        </Card>
 
-        <div className={cardClass}>
+        <Card>
           <div className="flex justify-between items-center mb-6">
             <h3 className="text-lg font-bold text-xhs-text flex items-center">
               <Key className="mr-2 text-xhs-red" size={20} aria-hidden="true" />
               模型库
             </h3>
             {!isFormOpen && (
-              <button
-                type="button"
+              <Button
+                variant="ghost"
+                size="sm"
                 onClick={() => setIsFormOpen(true)}
-                className={`flex items-center text-sm font-medium text-xhs-red bg-red-50 px-4 py-2 rounded-xl hover:bg-red-100 transition-colors ${focusRing} focus-visible:ring-offset-xhs-surface`}
+                className="text-xhs-red bg-red-50 enabled:hover:bg-red-100 focus-visible:ring-offset-xhs-surface"
               >
                 <Plus size={16} className="mr-1" aria-hidden="true" /> 添加模型
-              </button>
+              </Button>
             )}
           </div>
 
@@ -556,104 +560,90 @@ const SettingsView: React.FC<SettingsProps> = ({ settings, onSettingsUpdate }) =
                 <h4 className="font-semibold text-xhs-text">
                   {editingModelId ? '编辑模型配置' : '添加新模型配置'}
                 </h4>
-                <button
-                  type="button"
+                <IconButton
+                  ariaLabel="关闭"
                   onClick={resetForm}
-                  className={`text-gray-400 hover:text-gray-600 rounded-lg p-2 ${focusRing} focus-visible:ring-offset-gray-50`}
-                  aria-label="关闭"
+                  className="rounded-lg focus-visible:ring-offset-gray-50"
                 >
                   <X size={20} aria-hidden="true" />
-                </button>
+                </IconButton>
               </div>
 
               <div className="grid md:grid-cols-2 gap-4 mb-4">
-                <div className="space-y-1">
-                  <label className="text-xs text-xhs-secondary ml-1">显示名称</label>
-                  <input
-                    placeholder="例如: GPT-4o"
-                    className={`w-full p-3 rounded-xl border border-xhs-border bg-white ${focusRing} focus-visible:ring-offset-gray-50`}
-                    value={modelForm.displayName}
-                    onChange={(e) =>
-                      setModelForm({ ...modelForm, displayName: e.target.value })
-                    }
-                  />
-                </div>
-                <div className="space-y-1">
-                  <label className="text-xs text-xhs-secondary ml-1">模型 ID</label>
-                  <input
-                    placeholder="例如: gpt-4o"
-                    className={`w-full p-3 rounded-xl border border-xhs-border bg-white ${focusRing} focus-visible:ring-offset-gray-50`}
-                    value={modelForm.name}
-                    onChange={(e) =>
-                      setModelForm({ ...modelForm, name: e.target.value })
-                    }
-                  />
-                </div>
-                <div className="md:col-span-2 space-y-1 relative">
-                  <label className="text-xs text-xhs-secondary ml-1">API Key</label>
-                  <input
+                <Input
+                  label="显示名称"
+                  placeholder="例如: GPT-4o"
+                  value={modelForm.displayName || ''}
+                  onChange={(e) =>
+                    setModelForm({ ...modelForm, displayName: e.target.value })
+                  }
+                  className="focus-visible:ring-offset-gray-50"
+                />
+                <Input
+                  label="模型 ID"
+                  placeholder="例如: gpt-4o"
+                  value={modelForm.name || ''}
+                  onChange={(e) => setModelForm({ ...modelForm, name: e.target.value })}
+                  className="focus-visible:ring-offset-gray-50"
+                />
+                <div className="md:col-span-2">
+                  <Input
+                    label="API Key"
                     type="password"
                     placeholder="选填，仅本地保存，不会同步到云端"
-                    className={`w-full p-3 rounded-xl border border-xhs-border bg-white ${focusRing} focus-visible:ring-offset-gray-50`}
-                    value={modelForm.apiKey}
+                    value={modelForm.apiKey || ''}
                     onChange={(e) =>
                       setModelForm({ ...modelForm, apiKey: e.target.value })
                     }
+                    className="focus-visible:ring-offset-gray-50"
                   />
                 </div>
-                <div className="md:col-span-2 space-y-1">
-                  <label className="text-xs text-xhs-secondary ml-1">Base URL（可选）</label>
-                  <input
+                <div className="md:col-span-2">
+                  <Input
+                    label="Base URL（可选）"
                     type="text"
                     placeholder="例如: https://api.openai.com"
-                    className={`w-full p-3 rounded-xl border border-xhs-border bg-white ${focusRing} focus-visible:ring-offset-gray-50`}
                     value={modelForm.baseUrl || ''}
                     onChange={(e) =>
                       setModelForm({ ...modelForm, baseUrl: e.target.value })
                     }
+                    helperText="可自由填写；仅支持 https，且不能是内网地址。"
+                    className="focus-visible:ring-offset-gray-50"
                   />
-                  <p className="text-[11px] text-gray-400 ml-1">
-                    可自由填写；仅支持 https，且不能是内网地址。
-                  </p>
                 </div>
-                <div className="md:col-span-2 space-y-1">
-                  <label className="text-xs text-xhs-secondary ml-1">Path（可选）</label>
-                  <input
+                <div className="md:col-span-2">
+                  <Input
+                    label="Path（可选）"
                     type="text"
                     placeholder="例如: /v1/chat/completions"
-                    className={`w-full p-3 rounded-xl border border-xhs-border bg-white ${focusRing} focus-visible:ring-offset-gray-50`}
                     value={modelForm.path || ''}
-                    onChange={(e) =>
-                      setModelForm({ ...modelForm, path: e.target.value })
-                    }
+                    onChange={(e) => setModelForm({ ...modelForm, path: e.target.value })}
+                    className="focus-visible:ring-offset-gray-50"
                   />
                 </div>
               </div>
 
               <div className="flex justify-end gap-3 pt-2">
-                <button
-                  type="button"
+                <Button
+                  variant="ghost"
                   onClick={resetForm}
-                  className={`px-3 py-2 text-xhs-secondary hover:text-xhs-text text-sm font-medium rounded-lg ${focusRing} focus-visible:ring-offset-gray-50`}
+                  className="text-xhs-secondary enabled:hover:text-xhs-text focus-visible:ring-offset-gray-50"
                 >
                   取消
-                </button>
-                <button
-                  type="button"
+                </Button>
+                <Button
+                  variant="primary"
                   onClick={handleSaveModelConfig}
-                  className={`px-6 py-2 bg-xhs-red text-white rounded-xl font-medium hover:bg-red-600 text-sm shadow-soft transition-colors ${focusRing} focus-visible:ring-offset-gray-50`}
+                  className="shadow-soft focus-visible:ring-offset-gray-50"
                 >
                   {editingModelId ? '更新配置' : '确认添加'}
-                </button>
+                </Button>
               </div>
             </div>
           )}
 
           <div className="space-y-4">
             {formData.models.map((model) => {
-              const buttonBase =
-                'px-3 py-1.5 rounded-xl text-xs font-medium border transition-colors flex items-center';
-
               const buttonStateClass =
                 testResult?.id === model.id && testResult.status === 'success'
                   ? 'bg-green-50 text-green-700 border-green-200'
@@ -673,31 +663,35 @@ const SettingsView: React.FC<SettingsProps> = ({ settings, onSettingsUpdate }) =
                     <div>
                       <h4 className="font-bold text-xhs-text">{model.displayName}</h4>
                       <div className="flex flex-wrap items-center text-xs text-xhs-secondary gap-x-3 gap-y-1 mt-1">
-                        <span className="bg-gray-100 px-2 py-0.5 rounded text-gray-600 font-mono">
+                        <Badge variant="neutral" className="font-mono">
                           {model.name}
-                        </span>
+                        </Badge>
                         {model.apiKey && (
-                          <span className="text-green-600 flex items-center">
-                            <Key size={10} className="mr-1" aria-hidden="true" /> 已配置 Key
-                          </span>
+                          <Badge variant="success">
+                            <Key size={10} aria-hidden="true" /> 已配置 Key
+                          </Badge>
                         )}
                         {(model.baseUrl || model.path) && (
-                          <span className="text-blue-600 bg-blue-50 px-2 py-0.5 rounded font-mono max-w-[260px] truncate">
+                          <Badge
+                            variant="info"
+                            className="font-mono max-w-[260px] overflow-hidden text-ellipsis whitespace-nowrap"
+                          >
                             {`${model.baseUrl || ''}${model.path || ''}`}
-                          </span>
+                          </Badge>
                         )}
                       </div>
                     </div>
                   </div>
 
                   <div className="flex items-center gap-2">
-                    <button
-                      type="button"
+                    <Button
+                      size="sm"
+                      variant="secondary"
                       onClick={() => handleTestConnection(model.id)}
                       disabled={
                         testResult?.id === model.id && testResult.status === 'testing'
                       }
-                      className={`${buttonBase} ${buttonStateClass} ${focusRing} focus-visible:ring-offset-xhs-surface disabled:opacity-60 disabled:cursor-not-allowed`}
+                      className={`${buttonStateClass} focus-visible:ring-offset-xhs-surface`}
                     >
                       {testResult?.id === model.id &&
                       testResult.status === 'testing' ? (
@@ -726,35 +720,34 @@ const SettingsView: React.FC<SettingsProps> = ({ settings, onSettingsUpdate }) =
                           : testResult?.id === model.id && testResult.status === 'failed'
                             ? '失败'
                             : '测试'}
-                    </button>
+                    </Button>
 
-                    <button
-                      type="button"
+                    <IconButton
+                      ariaLabel="编辑"
                       onClick={() => handleEditModel(model)}
-                      className={`p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-colors ${focusRing} focus-visible:ring-offset-xhs-surface`}
-                      aria-label="编辑"
+                      className="text-gray-400 enabled:hover:text-blue-600 enabled:hover:bg-blue-50 focus-visible:ring-offset-xhs-surface"
                       title="编辑"
                     >
                       <Edit2 size={16} aria-hidden="true" />
-                    </button>
+                    </IconButton>
 
                     {!model.id.startsWith('default') && (
-                      <button
-                        type="button"
+                      <IconButton
+                        ariaLabel="删除"
+                        variant="danger"
                         onClick={() => handleDeleteModel(model.id)}
-                        className={`p-2 text-gray-400 hover:text-xhs-red hover:bg-red-50 rounded-xl transition-colors ${focusRing} focus-visible:ring-offset-xhs-surface`}
-                        aria-label="删除"
+                        className="focus-visible:ring-offset-xhs-surface"
                         title="删除"
                       >
                         <Trash2 size={16} aria-hidden="true" />
-                      </button>
+                      </IconButton>
                     )}
                   </div>
                 </div>
               );
             })}
           </div>
-        </div>
+        </Card>
       </div>
     </div>
   );

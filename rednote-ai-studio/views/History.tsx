@@ -2,6 +2,9 @@ import React, { useEffect, useState } from 'react';
 import { getHistory, deleteHistory } from '../services/db';
 import { GeneratedPost } from '../types';
 import { Calendar, Trash2, FileText, CheckCircle2 } from 'lucide-react';
+import { Badge } from '../components/ui/Badge';
+import { Card } from '../components/ui/Card';
+import { IconButton } from '../components/ui/IconButton';
 
 interface HistoryProps {
   onRestorePost: (post: GeneratedPost) => void;
@@ -55,11 +58,11 @@ const History: React.FC<HistoryProps> = ({ onRestorePost }) => {
       </div>
 
       {posts.length === 0 ? (
-        <div className="text-center py-20 bg-xhs-surface rounded-2xl border border-dashed border-xhs-border">
+        <Card className="text-center py-20 border-dashed">
           <Calendar size={48} className="mx-auto text-gray-300 mb-4" aria-hidden="true" />
           <h3 className="text-lg font-medium text-xhs-text">暂无历史记录</h3>
           <p className="text-xhs-secondary">快去创作你的第一篇笔记吧。</p>
-        </div>
+        </Card>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {posts.map((post) => {
@@ -98,23 +101,29 @@ const History: React.FC<HistoryProps> = ({ onRestorePost }) => {
 
                   <div className="absolute top-3 right-3">
                     {post.status === 'completed' ? (
-                      <span className="bg-green-600 text-white text-xs px-2 py-1 rounded-full flex items-center gap-1 shadow-soft">
+                      <Badge
+                        variant="success"
+                        className="bg-green-600 text-white border-transparent shadow-soft"
+                      >
                         <CheckCircle2 size={12} aria-hidden="true" /> 已完成
-                      </span>
+                      </Badge>
                     ) : (
-                      <span className="bg-blue-600 text-white text-xs px-2 py-1 rounded-full flex items-center gap-1 shadow-soft">
+                      <Badge
+                        variant="info"
+                        className="bg-blue-600 text-white border-transparent shadow-soft"
+                      >
                         <FileText size={12} aria-hidden="true" /> 大纲
-                      </span>
+                      </Badge>
                     )}
                   </div>
                 </div>
 
                 <div className="p-4 flex-1 flex flex-col">
                   <div className="flex items-center gap-2 mb-2">
-                    <span className="text-xs font-medium bg-red-50 text-xhs-red px-2 py-1 rounded">
+                    <Badge className="bg-red-50 text-xhs-red border-transparent rounded-lg">
                       {post.selectedOutline?.emoji || post.outlines[0]?.emoji}{' '}
                       {post.selectedOutline?.tags[0] || post.outlines[0]?.tags[0]}
-                    </span>
+                    </Badge>
                     <span className="text-xs text-gray-400 ml-auto">
                       {new Date(post.createdAt).toLocaleDateString()}
                     </span>
@@ -129,14 +138,14 @@ const History: React.FC<HistoryProps> = ({ onRestorePost }) => {
                     <span className="text-xs text-gray-400">
                       {post.status === 'completed' ? '点击查看详情' : '点击继续创作'}
                     </span>
-                    <button
-                      type="button"
+                    <IconButton
+                      ariaLabel="删除历史记录"
+                      variant="danger"
                       onClick={(e) => handleDelete(e, post.id)}
-                      className="text-gray-400 hover:text-xhs-red transition-colors rounded-lg p-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-xhs-red/30 focus-visible:ring-offset-2 focus-visible:ring-offset-xhs-bg"
-                      aria-label="删除历史记录"
+                      className="rounded-lg focus-visible:ring-offset-xhs-bg"
                     >
                       <Trash2 size={18} aria-hidden="true" />
-                    </button>
+                    </IconButton>
                   </div>
                 </div>
               </div>
