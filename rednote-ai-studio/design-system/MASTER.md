@@ -144,6 +144,17 @@ Soft UI 的关键：阴影“轻、短、分层”。
 - 使用 `button`（而不是可点击 `div`），保证键盘可达
 - 禁用态要明确（颜色更浅 + `cursor-not-allowed`）
 
+### 2.7 Modal
+
+- Overlay：`bg-black/50`
+- Panel：`bg-surface + border + shadow-soft-md`
+- Close（icon-only）：必须 `aria-label` + `focus-visible`
+
+### 2.8 Loading
+
+- 避免页面跳动：给 spinner/文案保留空间
+- Loading 文案：使用 `text-muted`（不要太抢）
+
 ---
 
 ## 3) Page Patterns
@@ -157,6 +168,16 @@ Soft UI 的关键：阴影“轻、短、分层”。
 
 ### Settings
 - 分组清晰：后端配置 / 模型 / 参数
+- 主 CTA（保存）：用 brand primary；次操作用 secondary/ghost
+
+### Auth
+- 背景：使用 `bg`
+- 表单：surface card
+- 表单控件：统一 rounded-xl + focus ring
+
+### Content / Preview
+- 最终预览：两栏布局（移动预览 + 文案区）
+- 文案 textarea：只读也要保持可读性（mono 可选）
 
 ---
 
@@ -172,5 +193,5 @@ Soft UI 的关键：阴影“轻、短、分层”。
 
 - 所有交互元素：hover + focus-visible 完整
 - 页面背景/卡片/按钮：风格统一
-- 关键页面（Generator/History/Settings）：视觉层级一致
+- 关键页面（Generator/History/Settings/Auth/成品预览）：视觉层级一致
 - 375 / 768 / 1024 / 1440 宽度无水平滚动
