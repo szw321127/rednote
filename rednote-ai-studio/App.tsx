@@ -12,6 +12,7 @@ import {
 import Sidebar from './components/Sidebar';
 import Generator from './views/Generator';
 import History from './views/History';
+import HistoryDetail from './views/HistoryDetail';
 import SettingsView from './views/Settings';
 import AuthView from './views/AuthView';
 import { AppSettings, DEFAULT_SETTINGS, GeneratedPost } from './types';
@@ -44,6 +45,21 @@ const HistoryRoute: React.FC<{
 
   return (
     <History
+      onRestorePost={(post) => {
+        onRestorePost(post);
+        navigate('/generator');
+      }}
+    />
+  );
+};
+
+const HistoryDetailRoute: React.FC<{
+  onRestorePost: (post: GeneratedPost) => void;
+}> = ({ onRestorePost }) => {
+  const navigate = useNavigate();
+
+  return (
+    <HistoryDetail
       onRestorePost={(post) => {
         onRestorePost(post);
         navigate('/generator');
@@ -145,6 +161,10 @@ const App: React.FC = () => {
           <Route
             path="history"
             element={<HistoryRoute onRestorePost={setRestoredPost} />}
+          />
+          <Route
+            path="history/:postId"
+            element={<HistoryDetailRoute onRestorePost={setRestoredPost} />}
           />
           <Route
             path="settings"

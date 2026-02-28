@@ -4,13 +4,16 @@ import { GeneratedPost } from '../types';
 import { Calendar, Trash2, FileText, CheckCircle2 } from 'lucide-react';
 import { Badge } from '../components/ui/Badge';
 import { Card } from '../components/ui/Card';
+import { Button } from '../components/ui/Button';
 import { IconButton } from '../components/ui/IconButton';
+import { useNavigate } from 'react-router-dom';
 
 interface HistoryProps {
   onRestorePost: (post: GeneratedPost) => void;
 }
 
 const History: React.FC<HistoryProps> = ({ onRestorePost }) => {
+  const navigate = useNavigate();
   const [posts, setPosts] = useState<GeneratedPost[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -42,7 +45,12 @@ const History: React.FC<HistoryProps> = ({ onRestorePost }) => {
     }
   };
 
-  const handleRestore = (post: GeneratedPost) => {
+  const handleNavigateToDetail = (post: GeneratedPost) => {
+    navigate(`/history/${post.id}`);
+  };
+
+  const handleRestore = (e: React.MouseEvent, post: GeneratedPost) => {
+    e.stopPropagation();
     onRestorePost(post);
   };
 
@@ -72,7 +80,7 @@ const History: React.FC<HistoryProps> = ({ onRestorePost }) => {
             const handleKeyDown = (e: React.KeyboardEvent) => {
               if (e.key === 'Enter' || e.key === ' ') {
                 e.preventDefault();
-                handleRestore(post);
+                handleNavigateToDetail(post);
               }
             };
 
@@ -81,7 +89,7 @@ const History: React.FC<HistoryProps> = ({ onRestorePost }) => {
                 key={post.id}
                 role="button"
                 tabIndex={0}
-                onClick={() => handleRestore(post)}
+                onClick={() => handleNavigateToDetail(post)}
                 onKeyDown={handleKeyDown}
                 className="bg-xhs-surface rounded-2xl overflow-hidden shadow-soft border border-xhs-border hover:shadow-soft-md transition-all cursor-pointer flex flex-col group hover:border-xhs-red/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-xhs-red/30 focus-visible:ring-offset-2 focus-visible:ring-offset-xhs-bg"
                 aria-label={`打开历史记录：${title}`}
@@ -135,17 +143,25 @@ const History: React.FC<HistoryProps> = ({ onRestorePost }) => {
                   </p>
 
                   <div className="mt-auto pt-4 border-t border-gray-100 flex justify-between items-center">
-                    <span className="text-xs text-gray-400">
-                      {post.status === 'completed' ? '点击查看详情' : '点击继续创作'}
-                    </span>
-                    <IconButton
-                      ariaLabel="删除历史记录"
-                      variant="danger"
-                      onClick={(e) => handleDelete(e, post.id)}
-                      className="rounded-lg focus-visible:ring-offset-xhs-bg"
-                    >
-                      <Trash2 size={18} aria-hidden="true" />
-                    </IconButton>
+                    <span className="text-xs text-gray-400">点击查看详情</span>
+                    <div className="flex items-center gap-2">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={(e) => handleRestore(e, post)}
+                        className="text-xhs-red bg-red-50 enabled:hover:bg-red-100 focus-visible:ring-offset-xhs-bg"
+                      >
+                        继续创作
+                      </Button>
+                      <IconButton
+                        ariaLabel="删除历史记录"
+                        variant="danger"
+                        onClick={(e) => handleDelete(e, post.id)}
+                        className="rounded-lg focus-visible:ring-offset-xhs-bg"
+                      >
+                        <Trash2 size={18} aria-hidden="true" />
+                      </IconButton>
+                    </div>
                   </div>
                 </div>
               </div>
