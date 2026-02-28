@@ -55,8 +55,10 @@ const Generator: React.FC<GeneratorProps> = ({
     <div className="max-w-4xl mx-auto pb-20">
       {/* Header */}
       <div className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-900">以此为题创作</h1>
-        <p className="text-gray-500 mt-2">一键生成爆款小红书图文。</p>
+        <h1 className="text-3xl font-bold text-xhs-text">以此为题创作</h1>
+        <p className="text-xhs-secondary mt-2">
+          一键生成爆款小红书图文。
+        </p>
       </div>
 
       {/* Step Indicator */}

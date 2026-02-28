@@ -41,24 +41,28 @@ export const OutlineStep: React.FC<OutlineStepProps> = ({
   return (
     <>
       <div className="space-y-6 animate-fade-in">
-        <div className="flex justify-between items-center">
+        <div className="flex flex-col md:flex-row md:justify-between md:items-center gap-4">
           <div>
-            <h2 className="text-xl font-bold text-gray-900">选择一个大纲</h2>
-            <p className="text-sm text-gray-500 mt-1">
+            <h2 className="text-xl font-bold text-xhs-text">选择一个大纲</h2>
+            <p className="text-sm text-xhs-secondary mt-1">
               共生成 {outlines.length} 个创意方向（最多9个）
             </p>
           </div>
+
           <div className="flex gap-3">
             <button
+              type="button"
               onClick={onBackToTopic}
-              className="text-sm text-gray-500 hover:text-xhs-red flex items-center bg-white border border-gray-200 px-3 py-1.5 rounded-lg shadow-sm"
+              className="text-sm text-xhs-secondary hover:text-xhs-red flex items-center bg-xhs-surface border border-xhs-border px-3 py-2 rounded-xl shadow-soft transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-xhs-red/30 focus-visible:ring-offset-2 focus-visible:ring-offset-xhs-bg"
             >
-              <ArrowLeft size={14} className="mr-1" /> 修改选题
+              <ArrowLeft size={14} className="mr-1" aria-hidden="true" /> 修改选题
             </button>
+
             {outlines.length < 9 && (
               <button
+                type="button"
                 onClick={onRegenerateOutlines}
-                className="text-sm text-white bg-xhs-red hover:bg-red-600 flex items-center px-3 py-1.5 rounded-lg shadow-sm transition-colors"
+                className="text-sm text-white bg-xhs-red hover:bg-red-600 flex items-center px-4 py-2 rounded-xl shadow-soft transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-xhs-red/30 focus-visible:ring-offset-2 focus-visible:ring-offset-xhs-bg"
               >
                 再生成一批
               </button>

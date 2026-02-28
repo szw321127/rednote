@@ -8,7 +8,6 @@ import { AppSettings, DEFAULT_SETTINGS, ViewState, GeneratedPost } from './types
 import { getSettings } from './services/db';
 import { ApiService } from './services/geminiService';
 import {
-  isLoggedIn,
   getUser,
   setTokens,
   setUser,
@@ -106,7 +105,7 @@ const App: React.FC = () => {
   };
 
   return (
-    <div className="flex min-h-screen bg-gray-50 text-gray-900 font-sans">
+    <div className="flex min-h-screen bg-xhs-bg text-xhs-text">
       <Sidebar
         currentView={currentView}
         onViewChange={setCurrentView}
