@@ -1,12 +1,13 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { ArrowLeft, CheckCircle2, FileText } from 'lucide-react';
+import { ArrowLeft, CheckCircle2, Copy, Download, FileText, Link2 } from 'lucide-react';
 
-import { getHistory } from '../services/db';
-import { GeneratedPost } from '../types';
+import { getHistoryById } from '../services/db';
+import { CompletedContent, GeneratedPost } from '../types';
 import { Badge } from '../components/ui/Badge';
 import { Button } from '../components/ui/Button';
 import { Card } from '../components/ui/Card';
+import { copyToClipboard, downloadImage } from '../utils/media';
 
 interface HistoryDetailProps {
   onRestorePost: (post: GeneratedPost) => void;
@@ -24,8 +25,7 @@ const HistoryDetail: React.FC<HistoryDetailProps> = ({ onRestorePost }) => {
       setLoading(true);
 
       try {
-        const items = await getHistory();
-        const found = items.find((item) => item.id === postId) ?? null;
+        const found = postId ? await getHistoryById(postId) : null;
         if (!cancelled) {
           setPost(found);
         }
@@ -100,10 +100,102 @@ const HistoryDetail: React.FC<HistoryDetailProps> = ({ onRestorePost }) => {
       </Badge>
     );
 
-  const latestCompleted = post.completedContents?.[post.completedContents.length - 1];
+  const completedContents = post.completedContents || [];
+  const hasCompletedContents = completedContents.length > 0;
+
+  const latestCompleted = hasCompletedContents
+    ? completedContents[completedContents.length - 1]
+    : undefined;
+
   const previewImageUrl = latestCompleted?.imageUrl || post.imageUrl;
   const previewText =
     latestCompleted?.caption || post.fullCaption || post.outlines[0]?.content || '';
+
+  const handleCopyShareLink = async () => {
+    const ok = await copyToClipboard(window.location.href);
+    alert(ok ? '链接已复制' : '复制失败');
+  };
+
+  const handleCopyCaption = async (caption: string) => {
+    const ok = await copyToClipboard(caption);
+    alert(ok ? '文案已复制到剪贴板！' : '复制失败，请手动复制');
+  };
+
+  const handleDownloadImage = async (imageUrl: string) => {
+    try {
+      await downloadImage(imageUrl);
+    } catch (error) {
+      console.error(error);
+      alert('下载失败');
+    }
+  };
+
+  const handleContinue = () => {
+    onRestorePost(post);
+  };
+
+  const renderContentCard = (content: CompletedContent, index: number) => {
+    return (
+      <Card key={content.id} className="p-6">
+        <div className="flex flex-col lg:flex-row gap-6">
+          <div className="w-full lg:w-64 shrink-0">
+            <div className="w-full aspect-[9/16] bg-gray-100 rounded-2xl overflow-hidden border border-xhs-border">
+              <img
+                src={content.imageUrl}
+                alt={content.outline.title}
+                loading="lazy"
+                decoding="async"
+                className="w-full h-full object-cover"
+              />
+            </div>
+          </div>
+
+          <div className="flex-1 min-w-0">
+            <div className="flex flex-wrap items-center gap-2">
+              <h3 className="text-lg font-bold text-xhs-text">
+                成品 {index + 1}
+              </h3>
+              <Badge variant="neutral" className="font-mono">
+                {content.outline.emoji} {content.outline.title}
+              </Badge>
+              <span className="text-xs text-gray-400 ml-auto">
+                {new Date(content.createdAt).toLocaleString()}
+              </span>
+            </div>
+
+            <div className="mt-4">
+              <label className="text-sm font-bold text-xhs-text mb-2 block">
+                文案
+              </label>
+              <textarea
+                readOnly
+                value={content.caption}
+                className="w-full min-h-[220px] p-4 text-sm bg-gray-50 rounded-2xl border border-xhs-border resize-none text-xhs-text font-mono leading-relaxed"
+              />
+            </div>
+
+            <div className="mt-4 flex flex-wrap gap-3">
+              <Button
+                variant="secondary"
+                onClick={() => handleCopyCaption(content.caption)}
+              >
+                <Copy size={16} className="mr-2" aria-hidden="true" /> 复制文案
+              </Button>
+              <Button
+                variant="secondary"
+                onClick={() => handleDownloadImage(content.imageUrl)}
+              >
+                <Download size={16} className="mr-2" aria-hidden="true" /> 下载图片
+              </Button>
+              <Button variant="primary" onClick={handleContinue} className="shadow-soft">
+                继续创作
+              </Button>
+            </div>
+          </div>
+        </div>
+      </Card>
+    );
+  };
 
   return (
     <div className="max-w-4xl mx-auto pb-20">
@@ -157,13 +249,12 @@ const HistoryDetail: React.FC<HistoryDetailProps> = ({ onRestorePost }) => {
                 主题：<span className="text-xhs-text">{post.topic}</span>
               </p>
 
-              <div className="mt-6 flex gap-3">
-                <Button
-                  variant="primary"
-                  onClick={() => onRestorePost(post)}
-                  className="shadow-soft"
-                >
+              <div className="mt-6 flex flex-wrap gap-3">
+                <Button variant="primary" onClick={handleContinue} className="shadow-soft">
                   继续创作
+                </Button>
+                <Button variant="secondary" onClick={handleCopyShareLink}>
+                  <Link2 size={16} className="mr-2" aria-hidden="true" /> 复制分享链接
                 </Button>
                 <Button variant="secondary" onClick={() => window.location.hash = '#/history'}>
                   返回列表
@@ -173,16 +264,23 @@ const HistoryDetail: React.FC<HistoryDetailProps> = ({ onRestorePost }) => {
           </div>
         </Card>
 
-        <Card>
-          <h2 className="text-lg font-bold text-xhs-text mb-4">内容预览</h2>
-          {previewText ? (
-            <pre className="whitespace-pre-wrap text-sm text-xhs-text bg-gray-50 border border-xhs-border rounded-2xl p-4">
-              {previewText}
-            </pre>
-          ) : (
-            <p className="text-sm text-gray-400">暂无可预览内容</p>
-          )}
-        </Card>
+        {hasCompletedContents ? (
+          <div className="grid gap-6">
+            <h2 className="text-lg font-bold text-xhs-text">成品画廊</h2>
+            {completedContents.map((content, index) => renderContentCard(content, index))}
+          </div>
+        ) : (
+          <Card>
+            <h2 className="text-lg font-bold text-xhs-text mb-4">内容预览</h2>
+            {previewText ? (
+              <pre className="whitespace-pre-wrap text-sm text-xhs-text bg-gray-50 border border-xhs-border rounded-2xl p-4">
+                {previewText}
+              </pre>
+            ) : (
+              <p className="text-sm text-gray-400">暂无可预览内容</p>
+            )}
+          </Card>
+        )}
       </div>
     </div>
   );
