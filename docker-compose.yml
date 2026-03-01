@@ -1,6 +1,26 @@
 version: '3.8'
 
 services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:16-alpine
+    container_name: rednote-postgres
+    restart: unless-stopped
+    environment:
+      - POSTGRES_DB=rednote
+      - POSTGRES_USER=rednote
+      - POSTGRES_PASSWORD=${DB_PASSWORD:?DB_PASSWORD is required}
+      - TZ=Asia/Shanghai
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    networks:
+      - rednote-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U rednote"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
   # Backend Service
   backend:
     # build:
@@ -17,6 +37,12 @@ services:
       - NODE_ENV=production
       - PORT=3000
       - TZ=Asia/Shanghai
+      - DATABASE_TYPE=postgres
+      - DATABASE_HOST=postgres
+      - DATABASE_PORT=5432
+      - DATABASE_NAME=rednote
+      - DATABASE_USER=rednote
+      - DATABASE_PASSWORD=${DB_PASSWORD:?DB_PASSWORD is required}
       - GOOGLE_API_KEY=${GOOGLE_API_KEY}
       - OPENAI_API_KEY=${OPENAI_API_KEY}
       - JWT_SECRET=${JWT_SECRET:?JWT_SECRET is required and must be strong}
@@ -24,6 +50,9 @@ services:
       - SESSION_SECRET=${SESSION_SECRET:?SESSION_SECRET is required and must be strong}
       - AI_BASE_URL_ALLOWLIST=${AI_BASE_URL_ALLOWLIST:-}
       - CORS_ORIGINS=http://localhost,http://localhost:80,http://frontend
+    depends_on:
+      postgres:
+        condition: service_healthy
     networks:
       - rednote-network
     healthcheck:
@@ -60,3 +89,6 @@ services:
 networks:
   rednote-network:
     driver: bridge
+
+volumes:
+  postgres-data:
